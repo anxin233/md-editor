@@ -61,6 +61,15 @@ function refreshTree() {
   <div v-if="settingsStore.showSidebar" class="sidebar">
     <div class="sidebar-header">
       <span class="sidebar-title">资源管理器</span>
+      <button
+        class="collapse-btn"
+        @click="settingsStore.toggleSidebar()"
+        title="折叠资源管理器 (Ctrl+Shift+B)"
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M3.646 11.354a.5.5 0 0 1 0-.708L7.293 7 3.646 3.354a.5.5 0 1 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708 0z" transform="scale(-1,1) translate(-16,0)"/>
+        </svg>
+      </button>
     </div>
 
     <div class="sidebar-actions">
@@ -149,8 +158,30 @@ function refreshTree() {
   height: var(--tabbar-height);
   display: flex;
   align-items: center;
-  padding: 0 16px;
+  padding: 0 8px 0 16px;
   border-bottom: 1px solid var(--border-color);
+}
+
+.collapse-btn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  opacity: 0;
+  transition: all var(--transition-fast);
+  margin-left: auto;
+}
+
+.sidebar-header:hover .collapse-btn {
+  opacity: 1;
+}
+
+.collapse-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .sidebar-title {

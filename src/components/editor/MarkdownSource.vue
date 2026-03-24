@@ -92,7 +92,6 @@ function createDarkTheme() {
       '.cm-foldGutter .cm-gutterElement': { padding: '0 4px' },
       '&.cm-focused': {
         outline: 'none',
-        boxShadow: 'inset 0 0 0 1px var(--editor-caret-glow)',
       },
       '.cm-scroller': { overflow: 'auto' },
     }, { dark: true }),
@@ -120,7 +119,6 @@ function createLightTheme() {
       '.cm-foldGutter .cm-gutterElement': { padding: '0 4px' },
       '&.cm-focused': {
         outline: 'none',
-        boxShadow: 'inset 0 0 0 1px var(--editor-caret-glow)',
       },
       '.cm-scroller': { overflow: 'auto' },
     }, { dark: false }),
@@ -300,6 +298,38 @@ watch(() => settingsStore.theme, () => {
   }
 })
 
+function setHeading(level: number) {
+  if (!view.value) return
+  const state = view.value.state
+  const { head } = state.selection.main
+  const line = state.doc.lineAt(head)
+  const text = line.text
+  const match = text.match(/^(#{1,6})\s/)
+
+  let from = line.from
+  let to = line.from
+  let insert = ''
+
+  if (match) {
+    to = from + match[0].length
+    insert = match[1].length === level ? '' : '#'.repeat(level) + ' '
+  } else {
+    insert = '#'.repeat(level) + ' '
+  }
+
+  view.value.dispatch({
+    changes: { from, to, insert },
+    selection: { anchor: from + insert.length },
+  })
+  view.value.focus()
+}
+
+watch(() => editorStore.headingRequest, (req) => {
+  if (!req) return
+  setHeading(req.level)
+  editorStore.clearHeadingRequest()
+})
+
 watch(() => editorStore.targetScrollLine, (line) => {
   if (line == null || !view.value) return
   try {
@@ -325,6 +355,7 @@ defineExpose({
   getView: () => view.value,
   insertText: insertTextAtCursor,
   focusEditor,
+  setHeading,
   selectRange: (start: number, end: number) => {
     if (!view.value) return
     view.value.dispatch({

@@ -173,6 +173,11 @@ function setupKeyboardShortcuts() {
       settingsStore.cycleTheme()
     }
 
+    if (ctrl && !e.shiftKey && !e.altKey && e.key >= '1' && e.key <= '6') {
+      e.preventDefault()
+      editorStore.requestHeading(parseInt(e.key))
+    }
+
   }
   window.addEventListener('keydown', keydownHandler)
 }

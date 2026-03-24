@@ -21,6 +21,7 @@ export interface FileChangeEvent {
 
 export interface ElectronAPI {
   getAppVersion: () => Promise<string>
+  openExternal: (url: string) => Promise<void>
   window: {
     minimize: () => Promise<void>
     maximize: () => Promise<void>
@@ -67,6 +68,7 @@ export interface ElectronAPI {
 
 const electronAPI: ElectronAPI = {
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize'),
     maximize: () => ipcRenderer.invoke('window:maximize'),

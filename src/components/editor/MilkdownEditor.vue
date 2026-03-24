@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { watch } from 'vue'
 import { useEditor, useInstance } from '@milkdown/vue'
-import { Editor, rootCtx, defaultValueCtx } from '@milkdown/core'
+import { Editor, rootCtx, defaultValueCtx, editorViewCtx } from '@milkdown/core'
 import { replaceAll } from '@milkdown/utils'
 import { commonmark } from '@milkdown/preset-commonmark'
 import { gfm } from '@milkdown/preset-gfm'
@@ -10,6 +10,9 @@ import { history } from '@milkdown/plugin-history'
 import { indent } from '@milkdown/plugin-indent'
 import { trailing } from '@milkdown/plugin-trailing'
 import { Milkdown } from '@milkdown/vue'
+import { useEditorStore } from '@/stores/editor'
+
+const editorStore = useEditorStore()
 
 const props = defineProps<{
   modelValue: string
@@ -64,6 +67,41 @@ watch(() => props.modelValue, (newVal) => {
       // editor might not be ready
     }
   }
+})
+
+function setHeading(level: number) {
+  const editor = getEditor()
+  if (!editor || loading.value) return
+
+  editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx)
+    const { state, dispatch } = view
+    const { schema, selection } = state
+    const { $from, $to } = selection
+
+    const headingType = schema.nodes.heading
+    const paragraphType = schema.nodes.paragraph
+    if (!headingType || !paragraphType) return
+
+    const isSameHeading = $from.parent.type === headingType
+      && $from.parent.attrs.level === level
+
+    const tr = state.tr
+    tr.setBlockType(
+      $from.pos,
+      $to.pos,
+      isSameHeading ? paragraphType : headingType,
+      isSameHeading ? undefined : { level }
+    )
+    dispatch(tr)
+    view.focus()
+  })
+}
+
+watch(() => editorStore.headingRequest, (req) => {
+  if (!req) return
+  setHeading(req.level)
+  editorStore.clearHeadingRequest()
 })
 </script>
 

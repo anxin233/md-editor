@@ -10,6 +10,7 @@ export const useEditorStore = defineStore('editor', () => {
   const encoding = ref('UTF-8')
   const targetScrollLine = ref<number | null>(null)
   const searchRequest = ref<{ id: number; mode: 'find' | 'replace' } | null>(null)
+  const headingRequest = ref<{ id: number; level: number } | null>(null)
 
   function updateCursor(line: number, column: number) {
     cursorLine.value = line
@@ -55,6 +56,14 @@ export const useEditorStore = defineStore('editor', () => {
     searchRequest.value = null
   }
 
+  function requestHeading(level: number) {
+    headingRequest.value = { id: Date.now(), level }
+  }
+
+  function clearHeadingRequest() {
+    headingRequest.value = null
+  }
+
   const cursorPosition = computed(() => `${cursorLine.value}:${cursorColumn.value}`)
 
   return {
@@ -67,11 +76,14 @@ export const useEditorStore = defineStore('editor', () => {
     cursorPosition,
     targetScrollLine,
     searchRequest,
+    headingRequest,
     updateCursor,
     updateStats,
     requestScrollToLine,
     clearScrollRequest,
     requestSearch,
     clearSearchRequest,
+    requestHeading,
+    clearHeadingRequest,
   }
 })

@@ -13,6 +13,13 @@ const appVersion = ref('1.0.0')
 const showShortcutDialog = ref(false)
 const showAboutDialog = ref(false)
 const showUpdateDialog = ref(false)
+const updateState = ref<'idle' | 'checking' | 'latest' | 'available' | 'error'>('idle')
+const latestVersion = ref('')
+const latestReleaseUrl = ref('')
+const latestReleaseNotes = ref('')
+const updateError = ref('')
+
+const GITHUB_REPO = 'anxin233/md-editor'
 
 const recentFiles = computed(() => settingsStore.recentFiles.slice(0, 8))
 
@@ -22,11 +29,14 @@ const shortcutGroups = [
   ['Ctrl+S / Ctrl+Shift+S', '保存 / 另存为'],
   ['Ctrl+F / Ctrl+H', '搜索 / 替换'],
   ['Ctrl+E', '切换编辑模式'],
-  ['Ctrl+Shift+B', '切换侧边栏'],
+  ['Ctrl+1~6', '设置标题级别 (H1~H6)'],
+  ['Ctrl+Shift+B', '资源管理器'],
   ['Ctrl+\\', '切换大纲'],
   ['Ctrl+Shift+F', '专注模式'],
   ['Ctrl+T', '插入表格'],
   ['Ctrl+Tab', '切换标签页'],
+  ['Ctrl+=/\u2212/0', '放大 / 缩小 / 重置字号'],
+  ['Ctrl+Shift+P', '切换主题'],
 ]
 
 function toggleMenu(menuName: string) {
@@ -105,9 +115,60 @@ function openAbout() {
   showAboutDialog.value = true
 }
 
-function checkUpdates() {
+function compareVersions(current: string, latest: string): number {
+  const a = current.replace(/^v/, '').split('.').map(Number)
+  const b = latest.replace(/^v/, '').split('.').map(Number)
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const diff = (b[i] || 0) - (a[i] || 0)
+    if (diff !== 0) return diff
+  }
+  return 0
+}
+
+async function checkUpdates() {
   closeMenu()
   showUpdateDialog.value = true
+  updateState.value = 'checking'
+  updateError.value = ''
+
+  try {
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+      headers: { 'Accept': 'application/vnd.github.v3+json' },
+    })
+
+    if (!res.ok) {
+      if (res.status === 404) {
+        updateState.value = 'error'
+        updateError.value = '\u5c1a\u672a\u53d1\u5e03\u4efb\u4f55 Release'
+        return
+      }
+      throw new Error(`GitHub API \u8fd4\u56de ${res.status}`)
+    }
+
+    const data = await res.json()
+    const tagName: string = data.tag_name || ''
+    latestVersion.value = tagName
+    latestReleaseUrl.value = data.html_url || `https://github.com/${GITHUB_REPO}/releases/latest`
+    latestReleaseNotes.value = data.name || tagName
+
+    if (compareVersions(appVersion.value, tagName) > 0) {
+      updateState.value = 'available'
+    } else {
+      updateState.value = 'latest'
+    }
+  } catch (err: any) {
+    updateState.value = 'error'
+    updateError.value = err?.message || '\u7f51\u7edc\u8bf7\u6c42\u5931\u8d25'
+  }
+}
+
+function openReleasePage() {
+  const url = latestReleaseUrl.value || `https://github.com/${GITHUB_REPO}/releases`
+  window.electronAPI?.openExternal(url)
+}
+
+function openAllReleases() {
+  window.electronAPI?.openExternal(`https://github.com/${GITHUB_REPO}/releases`)
 }
 
 onMounted(() => {
@@ -129,7 +190,6 @@ onUnmounted(() => {
   <div class="titlebar">
     <div class="titlebar-drag">
       <div class="titlebar-left">
-        <!-- 与 package.json build.icon（public/icon.png）同一资源，避免小尺寸 SVG 走样 -->
         <img class="app-icon" src="/icon.png" width="28" height="28" alt="" draggable="false" />
         <div class="menu-items">
           <div class="menu-root">
@@ -197,26 +257,33 @@ onUnmounted(() => {
             <button class="menu-trigger" :class="{ active: openMenu === 'view' }" @click.stop="toggleMenu('view')">视图(V)</button>
             <div v-if="openMenu === 'view'" class="dropdown-menu">
               <button class="dropdown-item" @click="runCommand({ type: 'view:set-mode', mode: 'wysiwyg' })">
-                <span>所见即所得</span><span class="check-mark" v-if="settingsStore.editorMode === 'wysiwyg'">✓</span>
+                <span>所见即所得</span>
+                <span class="item-right"><span class="check-mark" v-if="settingsStore.editorMode === 'wysiwyg'">✓</span><span class="shortcut">Ctrl+E</span></span>
               </button>
               <button class="dropdown-item" @click="runCommand({ type: 'view:set-mode', mode: 'split' })">
-                <span>分栏预览</span><span class="check-mark" v-if="settingsStore.editorMode === 'split'">✓</span>
+                <span>分栏预览</span>
+                <span class="item-right"><span class="check-mark" v-if="settingsStore.editorMode === 'split'">✓</span><span class="shortcut">Ctrl+E</span></span>
               </button>
               <button class="dropdown-item" @click="runCommand({ type: 'view:set-mode', mode: 'source' })">
-                <span>源码模式</span><span class="check-mark" v-if="settingsStore.editorMode === 'source'">✓</span>
+                <span>源码模式</span>
+                <span class="item-right"><span class="check-mark" v-if="settingsStore.editorMode === 'source'">✓</span><span class="shortcut">Ctrl+E</span></span>
               </button>
               <div class="menu-divider"></div>
               <button class="dropdown-item" @click="runCommand({ type: 'view:toggle-sidebar' })">
-                <span>侧边栏</span><span class="check-mark" v-if="settingsStore.showSidebar">✓</span>
+                <span>资源管理器</span>
+                <span class="item-right"><span class="check-mark" v-if="settingsStore.showSidebar">✓</span><span class="shortcut">Ctrl+Shift+B</span></span>
               </button>
               <button class="dropdown-item" @click="runCommand({ type: 'view:toggle-toc' })">
-                <span>大纲面板</span><span class="check-mark" v-if="settingsStore.showToc">✓</span>
+                <span>大纲面板</span>
+                <span class="item-right"><span class="check-mark" v-if="settingsStore.showToc">✓</span><span class="shortcut">Ctrl+\</span></span>
               </button>
               <button class="dropdown-item" @click="runCommand({ type: 'view:toggle-focus' })">
-                <span>专注模式</span><span class="check-mark" v-if="settingsStore.focusMode">✓</span>
+                <span>专注模式</span>
+                <span class="item-right"><span class="check-mark" v-if="settingsStore.focusMode">✓</span><span class="shortcut">Ctrl+Shift+F</span></span>
               </button>
               <button class="dropdown-item" @click="runCommand({ type: 'view:toggle-typewriter' })">
-                <span>打字机模式</span><span class="check-mark" v-if="settingsStore.typewriterMode">✓</span>
+                <span>打字机模式</span>
+                <span class="item-right"><span class="check-mark" v-if="settingsStore.typewriterMode">✓</span></span>
               </button>
               <div class="menu-divider"></div>
               <button class="dropdown-item" @click="runCommand({ type: 'view:font-inc' })">
@@ -327,7 +394,7 @@ onUnmounted(() => {
       <div v-if="showShortcutDialog" class="menu-dialog">
         <div class="dialog-header">
           <span>快捷键说明</span>
-          <button class="dialog-close" @click="showShortcutDialog = false">×</button>
+          <button class="dialog-close" @click="showShortcutDialog = false">&times;</button>
         </div>
         <div class="dialog-content">
           <div v-for="[keys, label] in shortcutGroups" :key="keys" class="shortcut-row">
@@ -340,7 +407,7 @@ onUnmounted(() => {
       <div v-else-if="showAboutDialog" class="menu-dialog">
         <div class="dialog-header">
           <span>关于 MD Editor</span>
-          <button class="dialog-close" @click="showAboutDialog = false">×</button>
+          <button class="dialog-close" @click="showAboutDialog = false">&times;</button>
         </div>
         <div class="dialog-content">
           <p class="dialog-title">MD Editor</p>
@@ -353,12 +420,31 @@ onUnmounted(() => {
       <div v-else class="menu-dialog">
         <div class="dialog-header">
           <span>检查更新</span>
-          <button class="dialog-close" @click="showUpdateDialog = false">×</button>
+          <button class="dialog-close" @click="showUpdateDialog = false">&times;</button>
         </div>
-        <div class="dialog-content">
-          <p class="dialog-title">当前版本：{{ appVersion }}</p>
-          <p>当前已接入菜单中的“检查更新”入口。</p>
-          <p>尚未配置在线更新源，如需自动更新，还需要补充发布服务器或版本源。</p>
+        <div class="dialog-content update-content">
+          <p class="dialog-title">当前版本：v{{ appVersion }}</p>
+
+          <div v-if="updateState === 'checking'" class="update-status update-checking">
+            <span class="update-spinner"></span>
+            <span>正在检查更新...</span>
+          </div>
+
+          <div v-else-if="updateState === 'latest'" class="update-status update-success">
+            <span>&#10003; 已是最新版本</span>
+          </div>
+
+          <div v-else-if="updateState === 'available'" class="update-available">
+            <p>发现新版本：<strong>{{ latestVersion }}</strong></p>
+            <p v-if="latestReleaseNotes && latestReleaseNotes !== latestVersion" class="update-notes">{{ latestReleaseNotes }}</p>
+            <button class="update-btn" @click="openReleasePage">前往下载</button>
+          </div>
+
+          <div v-else-if="updateState === 'error'" class="update-status update-error">
+            <span>检查失败：{{ updateError }}</span>
+          </div>
+
+          <button class="update-link" @click="openAllReleases">查看所有版本</button>
         </div>
       </div>
     </div>
@@ -487,6 +573,13 @@ onUnmounted(() => {
   flex-shrink: 0;
   font-size: 12px;
   color: var(--text-muted);
+}
+
+.item-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .recent-item {
@@ -653,5 +746,89 @@ onUnmounted(() => {
 
 .shortcut-label {
   color: var(--text-secondary);
+}
+
+/* Update dialog styles */
+.update-content {
+  gap: 14px;
+}
+
+.update-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+
+.update-checking {
+  color: var(--text-secondary);
+}
+
+.update-success {
+  color: #22c55e;
+}
+
+.update-error {
+  color: var(--danger-color);
+}
+
+.update-available {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  border-left: 3px solid var(--accent-color);
+}
+
+.update-available strong {
+  color: var(--accent-color);
+}
+
+.update-notes {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.update-btn {
+  align-self: flex-start;
+  padding: 6px 18px;
+  background: var(--accent-color);
+  color: var(--accent-text);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  transition: background var(--transition-fast);
+}
+
+.update-btn:hover {
+  background: var(--accent-hover);
+}
+
+.update-link {
+  align-self: center;
+  font-size: 12px;
+  color: var(--accent-color);
+  background: none;
+  padding: 4px 0;
+}
+
+.update-link:hover {
+  text-decoration: underline;
+}
+
+.update-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 </style>

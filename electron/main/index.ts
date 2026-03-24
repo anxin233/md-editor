@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { registerFileIpcHandlers, closeAllWatchers } from './ipc/file.ipc'
@@ -41,6 +41,7 @@ const createWindow = () => {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      spellcheck: false,
     }
   })
 
@@ -129,6 +130,12 @@ function registerWindowIpcHandlers() {
 
   ipcMain.handle('get-app-version', () => {
     return app.getVersion()
+  })
+
+  ipcMain.handle('shell:openExternal', (_event, url: string) => {
+    if (url.startsWith('https://')) {
+      shell.openExternal(url)
+    }
   })
 
   ipcMain.handle('window:confirmClose', async (_event, hasDirty: boolean) => {

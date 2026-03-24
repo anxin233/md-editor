@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
 import { MilkdownProvider } from '@milkdown/vue'
 import MilkdownEditor from './MilkdownEditor.vue'
 import { useFileStore } from '@/stores/file'
@@ -82,18 +82,38 @@ function placeCaretAtEnd(editor: HTMLElement) {
   selection.addRange(range)
 }
 
-function focusEditor(event?: MouseEvent) {
-  const editor = editorRootRef.value?.querySelector('.ProseMirror') as HTMLElement | null
+function getProseMirror(): HTMLElement | null {
+  return editorRootRef.value?.querySelector('.ProseMirror') as HTMLElement | null
+}
+
+function handleEmptyAreaClick(event: MouseEvent) {
+  const target = event.target as HTMLElement
+  if (target.closest('.ProseMirror')) return
+
+  const editor = getProseMirror()
   if (!editor) return
 
-  const target = event?.target as HTMLElement | null
-  const clickedEditor = !!target?.closest('.ProseMirror')
-
   editor.focus()
-  if (!clickedEditor) {
-    placeCaretAtEnd(editor)
-  }
+  requestAnimationFrame(() => placeCaretAtEnd(editor))
 }
+
+function autoFocus() {
+  nextTick(() => {
+    const editor = getProseMirror()
+    if (editor && !editor.contains(document.activeElement)) {
+      editor.focus()
+      placeCaretAtEnd(editor)
+    }
+  })
+}
+
+onMounted(() => {
+  setTimeout(autoFocus, 100)
+})
+
+watch(() => fileStore.activeTabId, () => {
+  setTimeout(autoFocus, 50)
+})
 </script>
 
 <template>
@@ -103,7 +123,7 @@ function focusEditor(event?: MouseEvent) {
     @paste="onPaste"
     @drop.prevent="onDrop"
     @dragover.prevent
-    @mousedown="focusEditor"
+    @mousedown="handleEmptyAreaClick"
   >
     <MilkdownProvider>
       <MilkdownEditor
@@ -120,48 +140,82 @@ function focusEditor(event?: MouseEvent) {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 24px 36px;
   background: var(--editor-bg);
   cursor: text;
+  min-width: 0;
 }
 </style>
 
 <style>
+/* Milkdown container */
 .milkdown {
   flex: 1;
   min-height: 100%;
   display: flex;
+  flex-direction: column;
   max-width: 800px;
   margin: 0 auto;
   width: 100%;
 }
 
-.milkdown .editor {
+/* Handle intermediate wrapper (class varies across Milkdown versions) */
+.milkdown > div {
   flex: 1;
-  min-height: 100%;
   display: flex;
+  flex-direction: column;
   outline: none;
+  min-width: 0;
 }
 
+/* ProseMirror base styles (essential for correct rendering) */
 .milkdown .ProseMirror {
   flex: 1;
   outline: none;
   min-height: 100%;
+  min-width: 0;
   padding-bottom: 45vh;
   font-size: var(--font-size-editor);
   line-height: 1.8;
   color: var(--text-primary);
   cursor: text;
   caret-color: var(--editor-caret);
+  position: relative;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  white-space: break-spaces;
+  -webkit-font-variant-ligatures: none;
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0;
 }
 
 .milkdown .ProseMirror-focused {
-  box-shadow: inset 0 0 0 1px var(--editor-caret-glow);
-  border-radius: var(--radius-sm);
+  outline: none;
 }
 
 .milkdown .ProseMirror > * + * {
   margin-top: 0.5em;
+}
+
+/* Block elements should use normal white-space */
+.milkdown .ProseMirror h1,
+.milkdown .ProseMirror h2,
+.milkdown .ProseMirror h3,
+.milkdown .ProseMirror h4,
+.milkdown .ProseMirror h5,
+.milkdown .ProseMirror h6,
+.milkdown .ProseMirror p,
+.milkdown .ProseMirror blockquote,
+.milkdown .ProseMirror ul,
+.milkdown .ProseMirror ol,
+.milkdown .ProseMirror li,
+.milkdown .ProseMirror table,
+.milkdown .ProseMirror hr {
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .milkdown .ProseMirror h1 {
@@ -215,6 +269,7 @@ function focusEditor(event?: MouseEvent) {
   background: var(--bg-tertiary);
   border-radius: var(--radius-sm);
   color: var(--accent-color);
+  white-space: pre-wrap;
 }
 
 .milkdown .ProseMirror pre {
@@ -224,6 +279,7 @@ function focusEditor(event?: MouseEvent) {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   overflow-x: auto;
+  white-space: pre;
 }
 
 .milkdown .ProseMirror pre code {
@@ -232,12 +288,15 @@ function focusEditor(event?: MouseEvent) {
   color: var(--text-primary);
   font-size: 0.85em;
   line-height: 1.6;
+  white-space: pre;
 }
 
 .milkdown .ProseMirror table {
   width: 100%;
   border-collapse: collapse;
   margin: 1em 0;
+  table-layout: fixed;
+  display: table;
 }
 
 .milkdown .ProseMirror th,
@@ -245,6 +304,9 @@ function focusEditor(event?: MouseEvent) {
   padding: 8px 12px;
   border: 1px solid var(--border-color);
   text-align: left;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  vertical-align: top;
 }
 
 .milkdown .ProseMirror th {
@@ -285,5 +347,11 @@ function focusEditor(event?: MouseEvent) {
 
 .milkdown .ProseMirror ::selection {
   background-color: var(--editor-selection);
+}
+
+/* Milkdown GFM table widget wrapper */
+.milkdown .tableWrapper {
+  overflow-x: auto;
+  margin: 1em 0;
 }
 </style>
