@@ -1,0 +1,41 @@
+[data-theme="nord"] {
+  --bg-primary: #2e3440;
+  --bg-secondary: #3b4252;
+  --bg-tertiary: #434c5e;
+  --bg-hover: #3b4252;
+  --bg-active: #4c566a;
+  --bg-selected: #5e81ac;
+
+  --text-primary: #d8dee9;
+  --text-secondary: #a3b1c4;
+  --text-muted: #6e7b8e;
+  --text-inverse: #2e3440;
+
+  --border-color: #434c5e;
+  --border-light: #3b4252;
+
+  --accent-color: #88c0d0;
+  --accent-hover: #8fbcbb;
+  --accent-text: #2e3440;
+
+  --danger-color: #bf616a;
+  --warning-color: #d08770;
+  --success-color: #a3be8c;
+
+  --scrollbar-thumb: #4c566a;
+  --scrollbar-track: transparent;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+
+  --tab-active-bg: #2e3440;
+  --tab-inactive-bg: #3b4252;
+  --tab-border: #434c5e;
+
+  --editor-bg: #2e3440;
+  --editor-line-number: #4c566a;
+  --editor-cursor: #d8dee9;
+  --editor-caret: #88c0d0;
+  --editor-caret-glow: rgba(136, 192, 208, 0.32);
+  --editor-selection: #434c5e;
+}

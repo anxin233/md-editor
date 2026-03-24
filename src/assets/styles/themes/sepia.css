@@ -1,0 +1,41 @@
+[data-theme="sepia"] {
+  --bg-primary: #f5f0e8;
+  --bg-secondary: #ede6d8;
+  --bg-tertiary: #e2d9c8;
+  --bg-hover: #e8e0d0;
+  --bg-active: #ddd4c2;
+  --bg-selected: #d4c9b4;
+
+  --text-primary: #433422;
+  --text-secondary: #6b5a45;
+  --text-muted: #9b8b75;
+  --text-inverse: #f5f0e8;
+
+  --border-color: #d4c9b4;
+  --border-light: #e2d9c8;
+
+  --accent-color: #8b6914;
+  --accent-hover: #7a5c10;
+  --accent-text: #ffffff;
+
+  --danger-color: #c53030;
+  --warning-color: #c05621;
+  --success-color: #2f855a;
+
+  --scrollbar-thumb: #c4b8a5;
+  --scrollbar-track: transparent;
+
+  --shadow-sm: 0 1px 3px rgba(67, 52, 34, 0.1);
+  --shadow-md: 0 4px 12px rgba(67, 52, 34, 0.12);
+
+  --tab-active-bg: #f5f0e8;
+  --tab-inactive-bg: #ede6d8;
+  --tab-border: #d4c9b4;
+
+  --editor-bg: #f5f0e8;
+  --editor-line-number: #b5a58f;
+  --editor-cursor: #433422;
+  --editor-caret: #9a6700;
+  --editor-caret-glow: rgba(154, 103, 0, 0.28);
+  --editor-selection: #d4c9b4;
+}

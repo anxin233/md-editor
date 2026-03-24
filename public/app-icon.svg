@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="MD Editor">
+  <defs>
+    <clipPath id="squircle">
+      <rect width="512" height="512" rx="113" ry="113"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#squircle)">
+    <rect width="512" height="512" fill="#ffffff"/>
+    <!-- 与 electron-builder 所用 icon.png 同源；经典粗体 M（与打包图标一致） -->
+    <path
+      fill="#4A90E0"
+      d="M 96 416 L 96 96 L 156 96 L 256 256 L 356 96 L 416 96 L 416 416 L 356 416 L 356 196 L 256 336 L 156 196 L 156 416 Z"
+    />
+  </g>
+</svg>

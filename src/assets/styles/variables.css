@@ -1,0 +1,42 @@
+:root {
+  /* Title bar */
+  --titlebar-height: 36px;
+  --titlebar-bg: var(--bg-primary);
+  --titlebar-text: var(--text-primary);
+
+  /* Status bar */
+  --statusbar-height: 24px;
+  --statusbar-bg: var(--bg-tertiary);
+  --statusbar-text: var(--text-secondary);
+
+  /* Sidebar */
+  --sidebar-width: 260px;
+  --sidebar-min-width: 180px;
+  --sidebar-max-width: 400px;
+
+  /* TOC panel */
+  --toc-width: 220px;
+
+  /* Tab bar */
+  --tabbar-height: 36px;
+
+  /* Font */
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  --font-family-mono: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  --font-size-base: 14px;
+  --font-size-small: 12px;
+  --font-size-editor: 16px;
+
+  /* Editor caret */
+  --editor-caret: #2563eb;
+  --editor-caret-glow: rgba(37, 99, 235, 0.28);
+
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s ease;
+}

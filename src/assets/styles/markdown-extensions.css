@@ -1,0 +1,214 @@
+/* ============ Shiki Code Blocks ============ */
+.preview-content .code-block-wrapper {
+  position: relative;
+  margin: 1em 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.preview-content .code-block-wrapper pre {
+  margin: 0;
+  padding: 16px 20px;
+  overflow-x: auto;
+  font-size: 0.85em;
+  line-height: 1.6;
+}
+
+.preview-content .code-block-wrapper code {
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+  border-radius: 0;
+}
+
+.preview-content .code-block-wrapper .code-lang {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-family);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ============ KaTeX Math ============ */
+.preview-content .katex-display {
+  margin: 1em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 8px 0;
+}
+
+.preview-content .katex {
+  font-size: 1.1em;
+}
+
+.preview-content .katex-error {
+  color: var(--danger-color);
+  font-family: var(--font-family-mono);
+  font-size: 0.85em;
+  white-space: pre-wrap;
+}
+
+/* ============ Mermaid Diagrams ============ */
+.preview-content .mermaid-pending {
+  margin: 1em 0;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.preview-content .mermaid-pending code {
+  background: none;
+  color: inherit;
+  padding: 0;
+  font-size: inherit;
+}
+
+.preview-content .mermaid-rendered {
+  margin: 1em 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
+.preview-content .mermaid-rendered svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.preview-content .mermaid-error-block {
+  margin: 1em 0;
+  padding: 12px 16px;
+  background: rgba(231, 76, 60, 0.1);
+  border: 1px solid var(--danger-color);
+  border-radius: var(--radius-md);
+  color: var(--danger-color);
+  font-size: 13px;
+}
+
+.preview-content .mermaid-error {
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  white-space: pre-wrap;
+  font-family: var(--font-family-mono);
+  font-size: 0.85em;
+}
+
+/* ============ Task Lists ============ */
+.preview-content .task-list-item {
+  list-style: none;
+  margin-left: -1.5em;
+}
+
+.preview-content .task-list-item input[type="checkbox"] {
+  margin-right: 8px;
+  vertical-align: middle;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-color);
+  cursor: default;
+}
+
+.preview-content .task-list-item label {
+  cursor: default;
+}
+
+.preview-content .task-list-item.checked > label {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+/* ============ Footnotes ============ */
+.preview-content .footnotes-sep {
+  margin: 2em 0 1em;
+  border: none;
+  border-top: 1px solid var(--border-color);
+}
+
+.preview-content section.footnotes {
+  font-size: 0.85em;
+  color: var(--text-secondary);
+  padding-top: 0.5em;
+}
+
+.preview-content section.footnotes ol {
+  padding-left: 1.5em;
+}
+
+.preview-content section.footnotes li {
+  margin: 0.5em 0;
+}
+
+.preview-content .footnote-ref a,
+.preview-content .footnote-backref {
+  color: var(--accent-color);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.preview-content .footnote-ref a:hover,
+.preview-content .footnote-backref:hover {
+  text-decoration: underline;
+}
+
+.preview-content sup.footnote-ref {
+  font-size: 0.75em;
+  vertical-align: super;
+}
+
+/* ============ YAML Front Matter ============ */
+.preview-content .front-matter-block {
+  margin: 0 0 1.5em;
+  padding: 0;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 0.85em;
+  background: var(--bg-secondary);
+}
+
+.preview-content .front-matter-block summary {
+  padding: 8px 16px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-family: var(--font-family);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  user-select: none;
+}
+
+.preview-content .front-matter-block summary:hover {
+  color: var(--text-secondary);
+}
+
+.preview-content .front-matter-block pre {
+  margin: 0;
+  padding: 8px 16px 12px;
+  background: none;
+  border: none;
+  border-top: 1px dashed var(--border-color);
+}
+
+.preview-content .front-matter-block code {
+  background: none;
+  padding: 0;
+  color: var(--text-primary);
+  font-size: 0.9em;
+}
+
+/* ============ Emoji ============ */
+.preview-content .emoji {
+  font-style: normal;
+  font-size: 1.2em;
+  vertical-align: -0.1em;
+}
