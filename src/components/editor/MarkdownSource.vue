@@ -324,10 +324,296 @@ function setHeading(level: number) {
   view.value.focus()
 }
 
+function wrapSelection(prefix: string, suffix: string) {
+  if (!view.value) return
+  const state = view.value.state
+  const { from, to } = state.selection.main
+  const selected = state.sliceDoc(from, to)
+
+  const beforeFrom = Math.max(0, from - prefix.length)
+  const afterTo = Math.min(state.doc.length, to + suffix.length)
+  const before = state.sliceDoc(beforeFrom, from)
+  const after = state.sliceDoc(to, afterTo)
+
+  if (before === prefix && after === suffix) {
+    view.value.dispatch({
+      changes: [
+        { from: beforeFrom, to: from, insert: '' },
+        { from: to, to: afterTo, insert: '' },
+      ],
+      selection: { anchor: beforeFrom, head: beforeFrom + selected.length },
+    })
+  } else if (selected.startsWith(prefix) && selected.endsWith(suffix) && selected.length >= prefix.length + suffix.length) {
+    const inner = selected.slice(prefix.length, selected.length - suffix.length)
+    view.value.dispatch({
+      changes: { from, to, insert: inner },
+      selection: { anchor: from, head: from + inner.length },
+    })
+  } else {
+    const wrapped = prefix + (selected || prefix === '`' ? selected : 'text') + suffix
+    view.value.dispatch({
+      changes: { from, to, insert: wrapped },
+      selection: selected
+        ? { anchor: from + prefix.length, head: from + prefix.length + selected.length }
+        : { anchor: from + prefix.length, head: from + wrapped.length - suffix.length },
+    })
+  }
+  view.value.focus()
+}
+
+function toggleLinePrefix(prefix: string) {
+  if (!view.value) return
+  const state = view.value.state
+  const { from, to } = state.selection.main
+  const startLine = state.doc.lineAt(from)
+  const endLine = state.doc.lineAt(to)
+
+  const changes: { from: number; to: number; insert: string }[] = []
+  let allHavePrefix = true
+
+  for (let i = startLine.number; i <= endLine.number; i++) {
+    const line = state.doc.line(i)
+    if (!line.text.startsWith(prefix)) {
+      allHavePrefix = false
+      break
+    }
+  }
+
+  for (let i = startLine.number; i <= endLine.number; i++) {
+    const line = state.doc.line(i)
+    if (allHavePrefix) {
+      changes.push({ from: line.from, to: line.from + prefix.length, insert: '' })
+    } else if (!line.text.startsWith(prefix)) {
+      changes.push({ from: line.from, to: line.from, insert: prefix })
+    }
+  }
+
+  view.value.dispatch({ changes })
+  view.value.focus()
+}
+
+function setParagraph() {
+  if (!view.value) return
+  const state = view.value.state
+  const { head } = state.selection.main
+  const line = state.doc.lineAt(head)
+  const match = line.text.match(/^#{1,6}\s/)
+  if (match) {
+    view.value.dispatch({
+      changes: { from: line.from, to: line.from + match[0].length, insert: '' },
+    })
+  }
+  view.value.focus()
+}
+
+function promoteHeading() {
+  if (!view.value) return
+  const state = view.value.state
+  const { head } = state.selection.main
+  const line = state.doc.lineAt(head)
+  const match = line.text.match(/^(#{1,6})\s/)
+  if (match) {
+    const level = match[1].length
+    if (level > 1) setHeading(level - 1)
+  } else {
+    setHeading(6)
+  }
+}
+
+function demoteHeading() {
+  if (!view.value) return
+  const state = view.value.state
+  const { head } = state.selection.main
+  const line = state.doc.lineAt(head)
+  const match = line.text.match(/^(#{1,6})\s/)
+  if (match) {
+    const level = match[1].length
+    if (level < 6) setHeading(level + 1)
+    else setParagraph()
+  }
+}
+
+function insertBlock(text: string) {
+  if (!view.value) return
+  const state = view.value.state
+  const { head } = state.selection.main
+  const line = state.doc.lineAt(head)
+  const insertPos = line.to
+  const prefix = line.text.length > 0 ? '\n' : ''
+  const full = prefix + text + '\n'
+  view.value.dispatch({
+    changes: { from: insertPos, insert: full },
+    selection: { anchor: insertPos + full.length },
+  })
+  view.value.focus()
+}
+
+function insertParagraphAbove() {
+  if (!view.value) return
+  const state = view.value.state
+  const { head } = state.selection.main
+  const line = state.doc.lineAt(head)
+  view.value.dispatch({
+    changes: { from: line.from, insert: '\n' },
+    selection: { anchor: line.from },
+  })
+  view.value.focus()
+}
+
+function insertParagraphBelow() {
+  if (!view.value) return
+  const state = view.value.state
+  const { head } = state.selection.main
+  const line = state.doc.lineAt(head)
+  view.value.dispatch({
+    changes: { from: line.to, insert: '\n' },
+    selection: { anchor: line.to + 1 },
+  })
+  view.value.focus()
+}
+
+function insertHyperlink() {
+  if (!view.value) return
+  const state = view.value.state
+  const { from, to } = state.selection.main
+  const selected = state.sliceDoc(from, to)
+  const link = selected ? `[${selected}](url)` : '[link text](url)'
+  const cursorPos = selected ? from + selected.length + 3 : from + 1
+  view.value.dispatch({
+    changes: { from, to, insert: link },
+    selection: { anchor: cursorPos, head: selected ? cursorPos + 3 : cursorPos + 9 },
+  })
+  view.value.focus()
+}
+
+function insertImage() {
+  if (!view.value) return
+  const state = view.value.state
+  const { from, to } = state.selection.main
+  const selected = state.sliceDoc(from, to)
+  const img = selected ? `![${selected}](url)` : '![alt text](url)'
+  view.value.dispatch({
+    changes: { from, to, insert: img },
+  })
+  view.value.focus()
+}
+
+function clearFormat() {
+  if (!view.value) return
+  const state = view.value.state
+  const { from, to } = state.selection.main
+  if (from === to) return
+  let text = state.sliceDoc(from, to)
+  text = text
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/~~(.+?)~~/g, '$1')
+    .replace(/`(.+?)`/g, '$1')
+    .replace(/<u>(.+?)<\/u>/g, '$1')
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1')
+    .replace(/!\[(.+?)\]\(.+?\)/g, '$1')
+  view.value.dispatch({
+    changes: { from, to, insert: text },
+    selection: { anchor: from, head: from + text.length },
+  })
+  view.value.focus()
+}
+
+function toggleOrderedList() {
+  if (!view.value) return
+  const state = view.value.state
+  const { from, to } = state.selection.main
+  const startLine = state.doc.lineAt(from)
+  const endLine = state.doc.lineAt(to)
+
+  const changes: { from: number; to: number; insert: string }[] = []
+  let allOrdered = true
+
+  for (let i = startLine.number; i <= endLine.number; i++) {
+    const line = state.doc.line(i)
+    if (!line.text.match(/^\d+\.\s/)) {
+      allOrdered = false
+      break
+    }
+  }
+
+  for (let i = startLine.number; i <= endLine.number; i++) {
+    const line = state.doc.line(i)
+    if (allOrdered) {
+      const m = line.text.match(/^\d+\.\s/)
+      if (m) changes.push({ from: line.from, to: line.from + m[0].length, insert: '' })
+    } else {
+      const num = i - startLine.number + 1
+      const m = line.text.match(/^\d+\.\s/)
+      if (m) {
+        changes.push({ from: line.from, to: line.from + m[0].length, insert: `${num}. ` })
+      } else {
+        changes.push({ from: line.from, to: line.from, insert: `${num}. ` })
+      }
+    }
+  }
+
+  view.value.dispatch({ changes })
+  view.value.focus()
+}
+
+function insertYamlFrontMatter() {
+  if (!view.value) return
+  const state = view.value.state
+  const docText = state.doc.toString()
+  if (docText.startsWith('---')) return
+  const fm = '---\ntitle: \ndate: ' + new Date().toISOString().split('T')[0] + '\n---\n\n'
+  view.value.dispatch({
+    changes: { from: 0, insert: fm },
+    selection: { anchor: 11 },
+  })
+  view.value.focus()
+}
+
+function handleFormatCommand(command: string, data?: string) {
+  if (!view.value) return
+  switch (command) {
+    case 'table-insert':
+      if (data) insertBlock('\n' + data + '\n')
+      break
+    case 'bold': wrapSelection('**', '**'); break
+    case 'italic': wrapSelection('*', '*'); break
+    case 'underline': wrapSelection('<u>', '</u>'); break
+    case 'code': wrapSelection('`', '`'); break
+    case 'strikethrough': wrapSelection('~~', '~~'); break
+    case 'comment': wrapSelection('<!-- ', ' -->'); break
+    case 'hyperlink': insertHyperlink(); break
+    case 'image': insertImage(); break
+    case 'clear-format': clearFormat(); break
+    case 'paragraph': setParagraph(); break
+    case 'promote-heading': promoteHeading(); break
+    case 'demote-heading': demoteHeading(); break
+    case 'code-block': insertBlock('```\n\n```'); break
+    case 'math-block': insertBlock('$$\n\n$$'); break
+    case 'blockquote': toggleLinePrefix('> '); break
+    case 'ordered-list': toggleOrderedList(); break
+    case 'unordered-list': toggleLinePrefix('- '); break
+    case 'task-list': toggleLinePrefix('- [ ] '); break
+    case 'horizontal-rule': insertBlock('---'); break
+    case 'insert-above': insertParagraphAbove(); break
+    case 'insert-below': insertParagraphBelow(); break
+    case 'footnote': insertBlock('[^1]: '); break
+    case 'toc': insertBlock('[TOC]'); break
+    case 'yaml-front-matter': insertYamlFrontMatter(); break
+    case 'table': break
+  }
+}
+
 watch(() => editorStore.headingRequest, (req) => {
   if (!req) return
   setHeading(req.level)
   editorStore.clearHeadingRequest()
+})
+
+watch(() => editorStore.formatRequest, (req) => {
+  if (!req) return
+  handleFormatCommand(req.command, req.data)
+  editorStore.clearFormatRequest()
 })
 
 watch(() => editorStore.targetScrollLine, (line) => {

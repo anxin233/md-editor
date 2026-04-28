@@ -1,5 +1,8 @@
 import type { EditorMode, ThemeMode } from '@/stores/settings'
 
+/** 导出格式命令常量，便于与菜单对齐及测试对照 */
+export { WYSIWYG_SUPPORTED_COMMANDS, isWysiwygFormatCommandSupported } from '@/utils/editorCommands'
+
 export type AppCommandDetail =
   | { type: 'file:new' }
   | { type: 'file:open' }
@@ -10,6 +13,8 @@ export type AppCommandDetail =
   | { type: 'file:export'; format: 'pdf' | 'html' | 'word' }
   | { type: 'edit:find' }
   | { type: 'edit:replace' }
+  | { type: 'paragraph:heading'; level: number }
+  | { type: 'format'; command: string }
   | { type: 'view:set-mode'; mode: EditorMode }
   | { type: 'view:toggle-sidebar' }
   | { type: 'view:toggle-toc' }

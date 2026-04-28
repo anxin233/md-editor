@@ -8,6 +8,7 @@ import WysiwygEditor from './WysiwygEditor.vue'
 import MarkdownSource from './MarkdownSource.vue'
 import TableEditor from './TableEditor.vue'
 import SearchReplace from './SearchReplace.vue'
+import { shortcutsForWelcome } from '@/utils/shortcutRegistry'
 
 const fileStore = useFileStore()
 const settingsStore = useSettingsStore()
@@ -15,6 +16,8 @@ const editorStore = useEditorStore()
 const showTableEditor = ref(false)
 const sourceEditorRef = ref<InstanceType<typeof MarkdownSource>>()
 const splitEditorRef = ref<InstanceType<typeof SplitEditor>>()
+
+const welcomeShortcutRows = shortcutsForWelcome()
 
 function onContentUpdate(value: string) {
   fileStore.updateContent(value)
@@ -35,24 +38,6 @@ async function openRecentFromWelcome(filePath: string) {
 
 function openTableEditor() {
   showTableEditor.value = true
-}
-
-function onTableInsert(markdown: string) {
-  const tab = fileStore.activeTab
-  if (!tab) return
-
-  if (settingsStore.editorMode === 'source' && sourceEditorRef.value) {
-    sourceEditorRef.value.insertText('\n' + markdown + '\n')
-  } else if (settingsStore.editorMode === 'split' && splitEditorRef.value) {
-    const sourceComp = splitEditorRef.value.getSourceEditor?.()
-    if (sourceComp?.insertText) {
-      sourceComp.insertText('\n' + markdown + '\n')
-    } else {
-      fileStore.updateContent(tab.content + '\n' + markdown + '\n')
-    }
-  } else {
-    fileStore.updateContent(tab.content + '\n' + markdown + '\n')
-  }
 }
 
 function onSearchContentUpdate(value: string) {
@@ -106,37 +91,9 @@ defineExpose({ openTableEditor })
         <h1 class="welcome-title">MD Editor</h1>
         <p class="welcome-subtitle">一个简洁的 Markdown 编辑器</p>
         <div class="welcome-shortcuts">
-          <div class="shortcut-item">
-            <kbd>Ctrl+N</kbd>
-            <span>新建文件</span>
-          </div>
-          <div class="shortcut-item">
-            <kbd>Ctrl+O</kbd>
-            <span>打开文件</span>
-          </div>
-          <div class="shortcut-item">
-            <kbd>Ctrl+S</kbd>
-            <span>保存 / Shift+S 另存为</span>
-          </div>
-          <div class="shortcut-item">
-            <kbd>Ctrl+E</kbd>
-            <span>切换编辑模式</span>
-          </div>
-          <div class="shortcut-item">
-            <kbd>Ctrl+Shift+B</kbd>
-            <span>切换侧边栏</span>
-          </div>
-          <div class="shortcut-item">
-            <kbd>Ctrl+\</kbd>
-            <span>切换大纲</span>
-          </div>
-          <div class="shortcut-item">
-            <kbd>Ctrl+/−/0</kbd>
-            <span>字体放大/缩小/重置</span>
-          </div>
-          <div class="shortcut-item">
-            <kbd>Ctrl+Tab</kbd>
-            <span>切换标签页</span>
+          <div v-for="(row, idx) in welcomeShortcutRows" :key="idx" class="shortcut-item">
+            <kbd>{{ row.keys }}</kbd>
+            <span>{{ row.label }}</span>
           </div>
         </div>
 
@@ -192,7 +149,6 @@ defineExpose({ openTableEditor })
     <TableEditor
       v-if="showTableEditor"
       @close="showTableEditor = false"
-      @insert="onTableInsert"
     />
   </div>
 </template>

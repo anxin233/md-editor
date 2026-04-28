@@ -2,7 +2,9 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useFileStore } from '@/stores/file'
+import type { AppCommandDetail } from '@/utils/appCommands'
 import { dispatchAppCommand } from '@/utils/appCommands'
+import { shortcutDisplayForAppCommand, shortcutDisplayById, shortcutsForHelpDialog } from '@/utils/shortcutRegistry'
 
 const settingsStore = useSettingsStore()
 const fileStore = useFileStore()
@@ -23,21 +25,11 @@ const GITHUB_REPO = 'anxin233/md-editor'
 
 const recentFiles = computed(() => settingsStore.recentFiles.slice(0, 8))
 
-const shortcutGroups = [
-  ['Ctrl+N', '新建文件'],
-  ['Ctrl+O', '打开文件'],
-  ['Ctrl+S / Ctrl+Shift+S', '保存 / 另存为'],
-  ['Ctrl+F / Ctrl+H', '搜索 / 替换'],
-  ['Ctrl+E', '切换编辑模式'],
-  ['Ctrl+1~6', '设置标题级别 (H1~H6)'],
-  ['Ctrl+Shift+B', '资源管理器'],
-  ['Ctrl+\\', '切换大纲'],
-  ['Ctrl+Shift+F', '专注模式'],
-  ['Ctrl+T', '插入表格'],
-  ['Ctrl+Tab', '切换标签页'],
-  ['Ctrl+=/\u2212/0', '放大 / 缩小 / 重置字号'],
-  ['Ctrl+Shift+P', '切换主题'],
-]
+const shortcutGroups = computed(() => shortcutsForHelpDialog())
+
+function sk(command: AppCommandDetail) {
+  return shortcutDisplayForAppCommand(command)
+}
 
 function toggleMenu(menuName: string) {
   openMenu.value = openMenu.value === menuName ? null : menuName
@@ -103,6 +95,10 @@ async function close() {
 function runCommand(detail: Parameters<typeof dispatchAppCommand>[0]) {
   closeMenu()
   dispatchAppCommand(detail)
+}
+
+function runFormatCommand(command: string) {
+  runCommand({ type: 'format', command })
 }
 
 function openShortcuts() {
@@ -196,20 +192,20 @@ onUnmounted(() => {
             <button class="menu-trigger" :class="{ active: openMenu === 'file' }" @click.stop="toggleMenu('file')">文件(F)</button>
             <div v-if="openMenu === 'file'" class="dropdown-menu">
               <button class="dropdown-item" @click="runCommand({ type: 'file:new' })">
-                <span>新建</span><span class="shortcut">Ctrl+N</span>
+                <span>新建</span><span class="shortcut">{{ sk({ type: 'file:new' }) }}</span>
               </button>
               <button class="dropdown-item" @click="runCommand({ type: 'file:open' })">
-                <span>打开文件</span><span class="shortcut">Ctrl+O</span>
+                <span>打开文件</span><span class="shortcut">{{ sk({ type: 'file:open' }) }}</span>
               </button>
               <button class="dropdown-item" @click="runCommand({ type: 'file:open-folder' })">
                 <span>打开文件夹</span>
               </button>
               <div class="menu-divider"></div>
               <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'file:save' })">
-                <span>保存</span><span class="shortcut">Ctrl+S</span>
+                <span>保存</span><span class="shortcut">{{ sk({ type: 'file:save' }) }}</span>
               </button>
               <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'file:save-as' })">
-                <span>另存为</span><span class="shortcut">Ctrl+Shift+S</span>
+                <span>另存为</span><span class="shortcut">{{ sk({ type: 'file:save-as' }) }}</span>
               </button>
               <div class="menu-divider"></div>
               <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'file:export', format: 'pdf' })">
@@ -245,10 +241,125 @@ onUnmounted(() => {
             <button class="menu-trigger" :class="{ active: openMenu === 'edit' }" @click.stop="toggleMenu('edit')">编辑(E)</button>
             <div v-if="openMenu === 'edit'" class="dropdown-menu">
               <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'edit:find' })">
-                <span>查找</span><span class="shortcut">Ctrl+F</span>
+                <span>查找</span><span class="shortcut">{{ sk({ type: 'edit:find' }) }}</span>
               </button>
               <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'edit:replace' })">
-                <span>替换</span><span class="shortcut">Ctrl+H</span>
+                <span>替换</span><span class="shortcut">{{ sk({ type: 'edit:replace' }) }}</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="menu-root">
+            <button class="menu-trigger" :class="{ active: openMenu === 'paragraph' }" @click.stop="toggleMenu('paragraph')">段落(P)</button>
+            <div v-if="openMenu === 'paragraph'" class="dropdown-menu dropdown-menu-scroll">
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'paragraph:heading', level: 1 })">
+                <span>一级标题</span><span class="shortcut">{{ sk({ type: 'paragraph:heading', level: 1 }) }}</span>
+              </button>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'paragraph:heading', level: 2 })">
+                <span>二级标题</span><span class="shortcut">{{ sk({ type: 'paragraph:heading', level: 2 }) }}</span>
+              </button>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'paragraph:heading', level: 3 })">
+                <span>三级标题</span><span class="shortcut">{{ sk({ type: 'paragraph:heading', level: 3 }) }}</span>
+              </button>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'paragraph:heading', level: 4 })">
+                <span>四级标题</span><span class="shortcut">{{ sk({ type: 'paragraph:heading', level: 4 }) }}</span>
+              </button>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'paragraph:heading', level: 5 })">
+                <span>五级标题</span><span class="shortcut">{{ sk({ type: 'paragraph:heading', level: 5 }) }}</span>
+              </button>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'paragraph:heading', level: 6 })">
+                <span>六级标题</span><span class="shortcut">{{ sk({ type: 'paragraph:heading', level: 6 }) }}</span>
+              </button>
+              <div class="menu-divider"></div>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'format', command: 'paragraph' })">
+                <span>段落</span><span class="shortcut">{{ sk({ type: 'format', command: 'paragraph' }) }}</span>
+              </button>
+              <div class="menu-divider"></div>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'format', command: 'promote-heading' })">
+                <span>提升标题级别</span><span class="shortcut">{{ sk({ type: 'format', command: 'promote-heading' }) }}</span>
+              </button>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'format', command: 'demote-heading' })">
+                <span>降低标题级别</span><span class="shortcut">{{ sk({ type: 'format', command: 'demote-heading' }) }}</span>
+              </button>
+              <div class="menu-divider"></div>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'format', command: 'table' })">
+                <span>表格</span><span class="shortcut">{{ sk({ type: 'format', command: 'table' }) }}</span>
+              </button>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'format', command: 'math-block' })">
+                <span>公式块</span><span class="shortcut">{{ sk({ type: 'format', command: 'math-block' }) }}</span>
+              </button>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'format', command: 'code-block' })">
+                <span>代码块</span><span class="shortcut">{{ sk({ type: 'format', command: 'code-block' }) }}</span>
+              </button>
+              <div class="menu-divider"></div>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'format', command: 'blockquote' })">
+                <span>引用</span><span class="shortcut">{{ sk({ type: 'format', command: 'blockquote' }) }}</span>
+              </button>
+              <div class="menu-divider"></div>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'format', command: 'ordered-list' })">
+                <span>有序列表</span><span class="shortcut">{{ sk({ type: 'format', command: 'ordered-list' }) }}</span>
+              </button>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'format', command: 'unordered-list' })">
+                <span>无序列表</span><span class="shortcut">{{ sk({ type: 'format', command: 'unordered-list' }) }}</span>
+              </button>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'format', command: 'task-list' })">
+                <span>任务列表</span><span class="shortcut">{{ sk({ type: 'format', command: 'task-list' }) }}</span>
+              </button>
+              <div class="menu-divider"></div>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'format', command: 'insert-above' })">
+                <span>在上方插入段落</span>
+              </button>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'format', command: 'insert-below' })">
+                <span>在下方插入段落</span>
+              </button>
+              <div class="menu-divider"></div>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'format', command: 'footnote' })">
+                <span>脚注</span>
+              </button>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'format', command: 'horizontal-rule' })">
+                <span>水平分割线</span>
+              </button>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'format', command: 'toc' })">
+                <span>插入 TOC 标记</span>
+              </button>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @click="runCommand({ type: 'format', command: 'yaml-front-matter' })">
+                <span>YAML Front Matter</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="menu-root">
+            <button class="menu-trigger" :class="{ active: openMenu === 'format' }" @click.stop="toggleMenu('format')">格式(O)</button>
+            <div v-if="openMenu === 'format'" class="dropdown-menu">
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @mousedown.prevent.stop="runFormatCommand('bold')">
+                <span>加粗</span><span class="shortcut">{{ sk({ type: 'format', command: 'bold' }) }}</span>
+              </button>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @mousedown.prevent.stop="runFormatCommand('italic')">
+                <span>斜体</span><span class="shortcut">{{ sk({ type: 'format', command: 'italic' }) }}</span>
+              </button>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @mousedown.prevent.stop="runFormatCommand('underline')">
+                <span>下划线</span><span class="shortcut">{{ sk({ type: 'format', command: 'underline' }) }}</span>
+              </button>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @mousedown.prevent.stop="runFormatCommand('code')">
+                <span>代码</span><span class="shortcut">{{ sk({ type: 'format', command: 'code' }) }}</span>
+              </button>
+              <div class="menu-divider"></div>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @mousedown.prevent.stop="runFormatCommand('strikethrough')">
+                <span>删除线</span><span class="shortcut">{{ sk({ type: 'format', command: 'strikethrough' }) }}</span>
+              </button>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @mousedown.prevent.stop="runFormatCommand('comment')">
+                <span>注释</span>
+              </button>
+              <div class="menu-divider"></div>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @mousedown.prevent.stop="runFormatCommand('hyperlink')">
+                <span>超链接</span><span class="shortcut">{{ sk({ type: 'format', command: 'hyperlink' }) }}</span>
+              </button>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @mousedown.prevent.stop="runFormatCommand('image')">
+                <span>图像</span>
+              </button>
+              <div class="menu-divider"></div>
+              <button class="dropdown-item" :disabled="!fileStore.activeTab" @mousedown.prevent.stop="runFormatCommand('clear-format')">
+                <span>清除样式</span><span class="shortcut">{{ sk({ type: 'format', command: 'clear-format' }) }}</span>
               </button>
             </div>
           </div>
@@ -258,28 +369,28 @@ onUnmounted(() => {
             <div v-if="openMenu === 'view'" class="dropdown-menu">
               <button class="dropdown-item" @click="runCommand({ type: 'view:set-mode', mode: 'wysiwyg' })">
                 <span>所见即所得</span>
-                <span class="item-right"><span class="check-mark" v-if="settingsStore.editorMode === 'wysiwyg'">✓</span><span class="shortcut">Ctrl+E</span></span>
+                <span class="item-right"><span class="check-mark" v-if="settingsStore.editorMode === 'wysiwyg'">✓</span><span class="shortcut">{{ shortcutDisplayById('view-cycle-mode') }}</span></span>
               </button>
               <button class="dropdown-item" @click="runCommand({ type: 'view:set-mode', mode: 'split' })">
                 <span>分栏预览</span>
-                <span class="item-right"><span class="check-mark" v-if="settingsStore.editorMode === 'split'">✓</span><span class="shortcut">Ctrl+E</span></span>
+                <span class="item-right"><span class="check-mark" v-if="settingsStore.editorMode === 'split'">✓</span><span class="shortcut">{{ shortcutDisplayById('view-cycle-mode') }}</span></span>
               </button>
               <button class="dropdown-item" @click="runCommand({ type: 'view:set-mode', mode: 'source' })">
                 <span>源码模式</span>
-                <span class="item-right"><span class="check-mark" v-if="settingsStore.editorMode === 'source'">✓</span><span class="shortcut">Ctrl+E</span></span>
+                <span class="item-right"><span class="check-mark" v-if="settingsStore.editorMode === 'source'">✓</span><span class="shortcut">{{ shortcutDisplayById('view-cycle-mode') }}</span></span>
               </button>
               <div class="menu-divider"></div>
               <button class="dropdown-item" @click="runCommand({ type: 'view:toggle-sidebar' })">
                 <span>资源管理器</span>
-                <span class="item-right"><span class="check-mark" v-if="settingsStore.showSidebar">✓</span><span class="shortcut">Ctrl+Shift+B</span></span>
+                <span class="item-right"><span class="check-mark" v-if="settingsStore.showSidebar">✓</span><span class="shortcut">{{ shortcutDisplayById('view-sidebar') }}</span></span>
               </button>
               <button class="dropdown-item" @click="runCommand({ type: 'view:toggle-toc' })">
                 <span>大纲面板</span>
-                <span class="item-right"><span class="check-mark" v-if="settingsStore.showToc">✓</span><span class="shortcut">Ctrl+\</span></span>
+                <span class="item-right"><span class="check-mark" v-if="settingsStore.showToc">✓</span><span class="shortcut">{{ shortcutDisplayById('view-toggle-toc') }}</span></span>
               </button>
               <button class="dropdown-item" @click="runCommand({ type: 'view:toggle-focus' })">
                 <span>专注模式</span>
-                <span class="item-right"><span class="check-mark" v-if="settingsStore.focusMode">✓</span><span class="shortcut">Ctrl+Shift+F</span></span>
+                <span class="item-right"><span class="check-mark" v-if="settingsStore.focusMode">✓</span><span class="shortcut">{{ shortcutDisplayById('view-focus') }}</span></span>
               </button>
               <button class="dropdown-item" @click="runCommand({ type: 'view:toggle-typewriter' })">
                 <span>打字机模式</span>
@@ -287,13 +398,13 @@ onUnmounted(() => {
               </button>
               <div class="menu-divider"></div>
               <button class="dropdown-item" @click="runCommand({ type: 'view:font-inc' })">
-                <span>放大字号</span><span class="shortcut">Ctrl+=</span>
+                <span>放大字号</span>
               </button>
               <button class="dropdown-item" @click="runCommand({ type: 'view:font-dec' })">
-                <span>缩小字号</span><span class="shortcut">Ctrl+-</span>
+                <span>缩小字号</span>
               </button>
               <button class="dropdown-item" @click="runCommand({ type: 'view:font-reset' })">
-                <span>重置字号</span><span class="shortcut">Ctrl+0</span>
+                <span>重置字号</span>
               </button>
             </div>
           </div>
@@ -397,9 +508,9 @@ onUnmounted(() => {
           <button class="dialog-close" @click="showShortcutDialog = false">&times;</button>
         </div>
         <div class="dialog-content">
-          <div v-for="[keys, label] in shortcutGroups" :key="keys" class="shortcut-row">
-            <span class="shortcut-keys">{{ keys }}</span>
-            <span class="shortcut-label">{{ label }}</span>
+          <div v-for="row in shortcutGroups" :key="row.keys + row.label" class="shortcut-row">
+            <span class="shortcut-keys">{{ row.keys }}</span>
+            <span class="shortcut-label">{{ row.label }}</span>
           </div>
         </div>
       </div>
@@ -527,6 +638,16 @@ onUnmounted(() => {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
+  -webkit-app-region: no-drag;
+}
+
+.dropdown-menu * {
+  -webkit-app-region: no-drag;
+}
+
+.dropdown-menu-scroll {
+  max-height: min(70vh, 600px);
+  overflow-y: auto;
 }
 
 .dropdown-item {

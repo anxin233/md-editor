@@ -51,40 +51,9 @@ function getExportStyles(): string {
   `
 }
 
-function guessMimeType(filePath: string): string {
-  const lower = filePath.toLowerCase()
-  if (lower.endsWith('.png')) return 'image/png'
-  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg'
-  if (lower.endsWith('.gif')) return 'image/gif'
-  if (lower.endsWith('.webp')) return 'image/webp'
-  if (lower.endsWith('.svg')) return 'image/svg+xml'
-  return 'application/octet-stream'
-}
-
 function toFileUrl(filePath: string): string {
   const normalized = filePath.replace(/\\/g, '/')
   return encodeURI(normalized.startsWith('/') ? `file://${normalized}` : `file:///${normalized}`)
-}
-
-function resolveLocalAssetPath(src: string, sourceFilePath?: string | null): string | null {
-  if (!src || /^(data:|blob:|https?:)/i.test(src)) return null
-
-  if (/^file:/i.test(src)) {
-    const url = new URL(src)
-    const pathname = decodeURIComponent(url.pathname)
-    return /^\/[a-zA-Z]:\//.test(pathname) ? pathname.slice(1) : pathname
-  }
-
-  if (/^[a-zA-Z]:[\\/]/.test(src) || src.startsWith('/')) {
-    return src
-  }
-
-  if (!sourceFilePath) return null
-
-  const baseUrl = new URL(toFileUrl(sourceFilePath))
-  const resolvedUrl = new URL(src, baseUrl)
-  const pathname = decodeURIComponent(resolvedUrl.pathname)
-  return /^\/[a-zA-Z]:\//.test(pathname) ? pathname.slice(1) : pathname
 }
 
 async function inlineLocalImages(renderedBody: string, sourceFilePath?: string | null): Promise<string> {
@@ -94,22 +63,17 @@ async function inlineLocalImages(renderedBody: string, sourceFilePath?: string |
 
   for (const img of images) {
     const src = img.getAttribute('src') || ''
-    const absolutePath = resolveLocalAssetPath(src, sourceFilePath)
-    if (!absolutePath) continue
-
     try {
-      await window.electronAPI?.file.authorize(absolutePath)
-      const bytes = await window.electronAPI?.file.readBinary(absolutePath)
-      if (!bytes) continue
-
+      const image = await window.electronAPI?.file.readDocumentImage(sourceFilePath ?? null, src)
+      if (!image) continue
       let binary = ''
-      for (const byte of bytes) {
+      for (const byte of image.bytes) {
         binary += String.fromCharCode(byte)
       }
       const base64 = btoa(binary)
-      img.setAttribute('src', `data:${guessMimeType(absolutePath)};base64,${base64}`)
+      img.setAttribute('src', `data:${image.mime};base64,${base64}`)
     } catch {
-      // Keep the original src when the file is no longer accessible.
+      // Keep the original src when inline is not allowed or read fails.
     }
   }
 

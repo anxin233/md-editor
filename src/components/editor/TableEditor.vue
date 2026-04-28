@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
+import { useEditorStore } from '@/stores/editor'
 
 const emit = defineEmits<{
   close: []
-  insert: [markdown: string]
 }>()
+
+const editorStore = useEditorStore()
 
 const rows = ref(3)
 const cols = ref(3)
@@ -79,7 +81,8 @@ function generateMarkdown(): string {
 }
 
 function onInsert() {
-  emit('insert', generateMarkdown())
+  const md = generateMarkdown()
+  editorStore.requestFormat('table-insert', md)
   emit('close')
 }
 
@@ -133,11 +136,11 @@ function onCellKeydown(e: KeyboardEvent, rowIdx: number, colIdx: number) {
 </script>
 
 <template>
-  <div class="table-editor-overlay" @click.self="$emit('close')" @keydown="onKeydown">
+    <div class="table-editor-overlay" @click.self="emit('close')" @keydown="onKeydown">
     <div class="table-editor-dialog">
       <div class="dialog-header">
         <span class="dialog-title">插入表格</span>
-        <button class="dialog-close" @click="$emit('close')">×</button>
+        <button class="dialog-close" @click="emit('close')">×</button>
       </div>
 
       <div class="dialog-body">
@@ -210,7 +213,7 @@ function onCellKeydown(e: KeyboardEvent, rowIdx: number, colIdx: number) {
       </div>
 
       <div class="dialog-footer">
-        <button class="btn btn-cancel" @click="$emit('close')">取消</button>
+        <button class="btn btn-cancel" @click="emit('close')">取消</button>
         <button class="btn btn-primary" @click="onInsert">
           插入 <kbd>Ctrl+Enter</kbd>
         </button>

@@ -1,6 +1,5 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron'
-import { dirname } from 'path'
-import { addAllowedPath } from './file.ipc'
+import { grantMarkdownFileAndDocDirectory, grantWorkspaceDirectory } from '../security/fileAccess'
 
 export function registerDialogIpcHandlers() {
   ipcMain.handle('dialog:openFile', async () => {
@@ -17,7 +16,7 @@ export function registerDialogIpcHandlers() {
 
     if (result.canceled || result.filePaths.length === 0) return null
     const filePath = result.filePaths[0]
-    addAllowedPath(dirname(filePath))
+    grantMarkdownFileAndDocDirectory(filePath)
     return filePath
   })
 
@@ -31,7 +30,7 @@ export function registerDialogIpcHandlers() {
 
     if (result.canceled || result.filePaths.length === 0) return null
     const folderPath = result.filePaths[0]
-    addAllowedPath(folderPath)
+    grantWorkspaceDirectory(folderPath)
     return folderPath
   })
 
@@ -48,25 +47,7 @@ export function registerDialogIpcHandlers() {
     })
 
     if (result.canceled || !result.filePath) return null
-    addAllowedPath(dirname(result.filePath))
+    grantMarkdownFileAndDocDirectory(result.filePath)
     return result.filePath
-  })
-
-  ipcMain.handle('dialog:openCssFile', async () => {
-    const window = BrowserWindow.getFocusedWindow()
-    if (!window) return null
-
-    const result = await dialog.showOpenDialog(window, {
-      properties: ['openFile'],
-      filters: [
-        { name: 'CSS', extensions: ['css'] },
-        { name: '所有文件', extensions: ['*'] }
-      ]
-    })
-
-    if (result.canceled || result.filePaths.length === 0) return null
-    const filePath = result.filePaths[0]
-    addAllowedPath(dirname(filePath))
-    return filePath
   })
 }

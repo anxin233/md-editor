@@ -22,6 +22,6 @@
       "@preload/*": ["electron/preload/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue", "electron/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue", "electron/**/*.ts", "scripts/**/*.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

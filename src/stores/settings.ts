@@ -64,40 +64,38 @@ export const useSettingsStore = defineStore('settings', () => {
     typewriterMode.value = !typewriterMode.value
   }
 
-  async function loadCustomCss(cssPath: string) {
-    try {
-      await window.electronAPI?.file.authorize(cssPath)
-      const cssContent = await window.electronAPI?.file.read(cssPath)
-      if (cssContent == null) return
-      if (customStyleEl) {
-        customStyleEl.textContent = cssContent
-      } else {
-        customStyleEl = document.createElement('style')
-        customStyleEl.id = 'custom-theme-css'
-        customStyleEl.textContent = cssContent
-        document.head.appendChild(customStyleEl)
-      }
-      customCssPath.value = cssPath
-      localStorage.setItem('md-editor-custom-css', cssPath)
-    } catch (err) {
-      console.error('Failed to load custom CSS:', err)
+  function applyCustomCssContent(cssContent: string) {
+    if (customStyleEl) {
+      customStyleEl.textContent = cssContent
+    } else {
+      customStyleEl = document.createElement('style')
+      customStyleEl.id = 'custom-theme-css'
+      customStyleEl.textContent = cssContent
+      document.head.appendChild(customStyleEl)
     }
   }
 
   async function pickAndLoadCustomCss() {
-    const cssPath = await window.electronAPI?.dialog.openCssFile()
-    if (!cssPath) return false
-    await loadCustomCss(cssPath)
+    const result = await window.electronAPI?.settings.pickCustomCss()
+    if (!result) return false
+    applyCustomCssContent(result.content)
+    customCssPath.value = result.path
+    localStorage.removeItem('md-editor-custom-css')
     return true
   }
 
-  function clearCustomCss() {
+  async function clearCustomCss() {
     if (customStyleEl) {
       customStyleEl.remove()
       customStyleEl = null
     }
     customCssPath.value = null
     localStorage.removeItem('md-editor-custom-css')
+    try {
+      await window.electronAPI?.settings.clearCustomCssPath()
+    } catch {
+      // ignore
+    }
   }
 
   function addRecentFile(filePath: string, fileName: string) {
@@ -158,9 +156,12 @@ export const useSettingsStore = defineStore('settings', () => {
       editorMode.value = savedMode
     }
 
-    const savedCustomCss = localStorage.getItem('md-editor-custom-css')
-    if (savedCustomCss) {
-      loadCustomCss(savedCustomCss)
+    localStorage.removeItem('md-editor-custom-css')
+
+    const persisted = await window.electronAPI?.settings.loadPersistedCustomCss?.()
+    if (persisted) {
+      applyCustomCssContent(persisted.content)
+      customCssPath.value = persisted.path
     }
 
     try {
@@ -203,7 +204,6 @@ export const useSettingsStore = defineStore('settings', () => {
     toggleToc,
     toggleFocusMode,
     toggleTypewriterMode,
-    loadCustomCss,
     pickAndLoadCustomCss,
     clearCustomCss,
     addRecentFile,

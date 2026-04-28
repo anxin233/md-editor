@@ -4,6 +4,7 @@ import { useEditorStore } from '@/stores/editor'
 import { useSettingsStore, BUILT_IN_THEMES } from '@/stores/settings'
 import { useFileStore } from '@/stores/file'
 import ExportMenu from '@/components/export/ExportMenu.vue'
+import { shortcutDisplayById } from '@/utils/shortcutRegistry'
 
 const editorStore = useEditorStore()
 const settingsStore = useSettingsStore()
@@ -101,7 +102,7 @@ async function pickCustomTheme() {
         行 {{ editorStore.cursorLine }}, 列 {{ editorStore.cursorColumn }}
       </span>
       <span class="status-item">{{ editorStore.encoding }}</span>
-      <span class="status-item" title="字体大小 (Ctrl+/-/0)">{{ settingsStore.fontSize }}px</span>
+      <span class="status-item" title="当前界面字号，可在「视图」菜单中放大、缩小或重置">{{ settingsStore.fontSize }}px</span>
 
       <div v-if="fileStore.activeTab" ref="exportWrapperRef" class="export-wrapper">
         <button
@@ -125,6 +126,10 @@ async function pickCustomTheme() {
       >
         表格
       </button>
+
+      <span class="status-item status-toast" v-if="editorStore.statusToast">
+        {{ editorStore.statusToast }}
+      </span>
 
       <button class="status-item status-btn" @click="cycleEditorMode">
         {{ modeLabels[settingsStore.editorMode] }}
@@ -178,7 +183,7 @@ async function pickCustomTheme() {
         class="status-item status-btn"
         :class="{ active: settingsStore.showToc }"
         @click="settingsStore.toggleToc"
-        title="大纲面板"
+        :title="'大纲面板 · ' + shortcutDisplayById('view-toggle-toc')"
       >
         大纲
       </button>
@@ -209,6 +214,14 @@ async function pickCustomTheme() {
 
 .status-item {
   white-space: nowrap;
+}
+
+.status-toast {
+  max-width: 42ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-muted);
+  font-size: 11px;
 }
 
 .status-btn {

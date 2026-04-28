@@ -11,6 +11,18 @@ export const useEditorStore = defineStore('editor', () => {
   const targetScrollLine = ref<number | null>(null)
   const searchRequest = ref<{ id: number; mode: 'find' | 'replace' } | null>(null)
   const headingRequest = ref<{ id: number; level: number } | null>(null)
+  const formatRequest = ref<{ id: number; command: string; data?: string } | null>(null)
+  const statusToast = ref('')
+  let statusToastTimer: ReturnType<typeof setTimeout> | null = null
+
+  function showStatusToast(message: string, durationMs = 3200) {
+    statusToast.value = message
+    if (statusToastTimer) clearTimeout(statusToastTimer)
+    statusToastTimer = setTimeout(() => {
+      statusToast.value = ''
+      statusToastTimer = null
+    }, durationMs)
+  }
 
   function updateCursor(line: number, column: number) {
     cursorLine.value = line
@@ -64,6 +76,14 @@ export const useEditorStore = defineStore('editor', () => {
     headingRequest.value = null
   }
 
+  function requestFormat(command: string, data?: string) {
+    formatRequest.value = { id: Date.now(), command, data }
+  }
+
+  function clearFormatRequest() {
+    formatRequest.value = null
+  }
+
   const cursorPosition = computed(() => `${cursorLine.value}:${cursorColumn.value}`)
 
   return {
@@ -77,6 +97,9 @@ export const useEditorStore = defineStore('editor', () => {
     targetScrollLine,
     searchRequest,
     headingRequest,
+    formatRequest,
+    statusToast,
+    showStatusToast,
     updateCursor,
     updateStats,
     requestScrollToLine,
@@ -85,5 +108,7 @@ export const useEditorStore = defineStore('editor', () => {
     clearSearchRequest,
     requestHeading,
     clearHeadingRequest,
+    requestFormat,
+    clearFormatRequest,
   }
 })

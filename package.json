@@ -13,7 +13,8 @@
     "build:linux": "vite build && electron-builder --linux",
     "build:portable": "vite build && electron-builder --win portable",
     "preview": "vite preview",
-    "type-check": "vue-tsc --noEmit"
+    "type-check": "vue-tsc --noEmit",
+    "docs:shortcuts": "tsx --tsconfig tsconfig.json scripts/update-readme-shortcuts.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.1",
@@ -54,6 +55,7 @@
     "@vitejs/plugin-vue": "^5.2.0",
     "electron": "^33.2.0",
     "electron-builder": "^25.1.8",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.0",
     "vite": "^6.0.0",
     "vite-plugin-electron": "^0.28.0",
@@ -62,7 +64,7 @@
   },
   "build": {
     "appId": "com.mdeditor.app",
-    "productName": "MD Editor",
+    "productName": "MDEditor",
     "copyright": "Copyright (c) 2026 MD Editor",
     "directories": {
       "output": "release/${version}"
@@ -97,14 +99,12 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
-        },
-        {
-          "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
-      "artifactName": "${productName}-${version}-win-${arch}.${ext}"
+      "artifactName": "${productName}-Setup-${version}-win-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -112,7 +112,10 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "MD Editor",
-      "installerLanguages": ["zh_CN", "en_US"],
+      "installerLanguages": [
+        "zh_CN",
+        "en_US"
+      ],
       "license": null
     },
     "mac": {

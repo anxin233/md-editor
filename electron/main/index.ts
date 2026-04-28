@@ -1,11 +1,12 @@
 import { existsSync } from 'node:fs'
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, Menu } from 'electron'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { registerFileIpcHandlers, closeAllWatchers } from './ipc/file.ipc'
 import { registerDialogIpcHandlers } from './ipc/dialog.ipc'
 import { registerExportIpcHandlers } from './ipc/export.ipc'
 import { registerRecentIpcHandlers } from './ipc/recent.ipc'
+import { registerSettingsIpcHandlers } from './ipc/settings.ipc'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -23,6 +24,8 @@ function resolveWindowIcon(): string | undefined {
   if (existsSync(distIcon)) return distIcon
   return undefined
 }
+
+Menu.setApplicationMenu(null)
 
 const createWindow = () => {
   const windowIcon = resolveWindowIcon()
@@ -87,6 +90,7 @@ app.whenReady().then(() => {
   registerDialogIpcHandlers()
   registerExportIpcHandlers()
   registerRecentIpcHandlers()
+  registerSettingsIpcHandlers()
   registerWindowIpcHandlers()
   createWindow()
 

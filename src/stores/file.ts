@@ -164,17 +164,19 @@ export const useFileStore = defineStore('file', () => {
     }
   }
 
-  async function authorizePath(filePath: string) {
-    await window.electronAPI?.file.authorize(filePath)
-  }
-
   async function openPath(filePath: string) {
-    await authorizePath(filePath)
-    const content = await window.electronAPI?.file.read(filePath)
-    if (content == null) return null
-    const fileName = filePath.split(/[\\/]/).pop() || 'unknown.md'
-    openFileTab(filePath, fileName, content)
-    return { fileName, content }
+    try {
+      const content = await window.electronAPI?.file.read(filePath)
+      if (content == null) return null
+      const fileName = filePath.split(/[\\/]/).pop() || 'unknown.md'
+      openFileTab(filePath, fileName, content)
+      return { fileName, content }
+    } catch {
+      const routed = await window.electronAPI?.recent.open?.(filePath)
+      if (!routed) return null
+      openFileTab(routed.filePath, routed.fileName, routed.content)
+      return { fileName: routed.fileName, content: routed.content }
+    }
   }
 
   async function saveTab(tabId: string, saveAs: boolean = false) {
@@ -187,7 +189,6 @@ export const useFileStore = defineStore('file', () => {
       if (!filePath) return false
     }
 
-    await authorizePath(filePath)
     await window.electronAPI?.file.write(filePath, tab.content)
     const fileName = filePath.split(/[\\/]/).pop() || 'unknown.md'
     markSaved(tab.id, filePath, fileName)
@@ -283,7 +284,6 @@ export const useFileStore = defineStore('file', () => {
     getDirtyTabs,
     getTabByPath,
     updateTabByPath,
-    authorizePath,
     openPath,
     saveTab,
     saveDirtyTabs,

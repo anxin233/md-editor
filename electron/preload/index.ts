@@ -4,7 +4,6 @@ export interface FileTreeNode {
   name: string
   path: string
   isDirectory: boolean
-  children?: FileTreeNode[]
 }
 
 export interface FileStat {
@@ -30,9 +29,12 @@ export interface ElectronAPI {
     confirmClose: (hasDirty: boolean) => Promise<number>
   }
   file: {
-    authorize: (targetPath: string) => Promise<boolean>
     read: (filePath: string) => Promise<string>
-    readBinary: (filePath: string) => Promise<Uint8Array>
+    /** 导出：仅允许文档目录下的安全相对路径图片 */
+    readDocumentImage: (
+      sourceMarkdownPath: string | null,
+      imageSrc: string
+    ) => Promise<{ bytes: Uint8Array; mime: string } | null>
     write: (filePath: string, content: string) => Promise<boolean>
     readDir: (dirPath: string) => Promise<FileTreeNode[]>
     stat: (filePath: string) => Promise<FileStat>
@@ -50,13 +52,18 @@ export interface ElectronAPI {
     openFile: () => Promise<string | null>
     openFolder: () => Promise<string | null>
     saveFile: (defaultPath?: string) => Promise<string | null>
-    openCssFile: () => Promise<string | null>
   }
   recent: {
     get: () => Promise<Array<{ path: string; name: string; time: number }>>
     add: (filePath: string, fileName: string) => Promise<Array<{ path: string; name: string; time: number }>>
+    open: (filePath: string) => Promise<{ filePath: string; fileName: string; content: string } | null>
     remove: (filePath: string) => Promise<Array<{ path: string; name: string; time: number }>>
     clear: () => Promise<boolean>
+  }
+  settings: {
+    pickCustomCss: () => Promise<{ path: string; content: string } | null>
+    loadPersistedCustomCss: () => Promise<{ path: string; content: string } | null>
+    clearCustomCssPath: () => Promise<boolean>
   }
   export: {
     pdf: (htmlContent: string, defaultName?: string) => Promise<boolean>
@@ -77,9 +84,9 @@ const electronAPI: ElectronAPI = {
     confirmClose: (hasDirty: boolean) => ipcRenderer.invoke('window:confirmClose', hasDirty),
   },
   file: {
-    authorize: (targetPath: string) => ipcRenderer.invoke('file:grantAccess', targetPath),
     read: (filePath: string) => ipcRenderer.invoke('file:read', filePath),
-    readBinary: (filePath: string) => ipcRenderer.invoke('file:readBinary', filePath),
+    readDocumentImage: (sourceMarkdownPath: string | null, imageSrc: string) =>
+      ipcRenderer.invoke('file:readDocumentImage', sourceMarkdownPath, imageSrc),
     write: (filePath: string, content: string) => ipcRenderer.invoke('file:write', filePath, content),
     readDir: (dirPath: string) => ipcRenderer.invoke('file:readDir', dirPath),
     stat: (filePath: string) => ipcRenderer.invoke('file:stat', filePath),
@@ -101,13 +108,18 @@ const electronAPI: ElectronAPI = {
     openFile: () => ipcRenderer.invoke('dialog:openFile'),
     openFolder: () => ipcRenderer.invoke('dialog:openFolder'),
     saveFile: (defaultPath?: string) => ipcRenderer.invoke('dialog:saveFile', defaultPath),
-    openCssFile: () => ipcRenderer.invoke('dialog:openCssFile'),
   },
   recent: {
     get: () => ipcRenderer.invoke('recent:get'),
     add: (filePath: string, fileName: string) => ipcRenderer.invoke('recent:add', filePath, fileName),
+    open: (filePath: string) => ipcRenderer.invoke('recent:open', filePath),
     remove: (filePath: string) => ipcRenderer.invoke('recent:remove', filePath),
     clear: () => ipcRenderer.invoke('recent:clear'),
+  },
+  settings: {
+    pickCustomCss: () => ipcRenderer.invoke('settings:pickCustomCss'),
+    loadPersistedCustomCss: () => ipcRenderer.invoke('settings:loadPersistedCustomCss'),
+    clearCustomCssPath: () => ipcRenderer.invoke('settings:clearCustomCssPath'),
   },
   export: {
     pdf: (htmlContent: string, defaultName?: string) => ipcRenderer.invoke('export:pdf', htmlContent, defaultName),

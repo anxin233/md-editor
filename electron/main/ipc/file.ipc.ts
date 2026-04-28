@@ -1,75 +1,54 @@
 import { ipcMain, BrowserWindow } from 'electron'
-import { readFile, writeFile, stat, readdir, mkdir, rename, unlink, rm, access } from 'fs/promises'
+import { readFile, writeFile, stat, readdir, mkdir, rename, unlink, rm } from 'fs/promises'
 import { watch, FSWatcher } from 'fs'
-import { dirname, isAbsolute, join, relative, resolve } from 'path'
+import { join, resolve } from 'path'
+import {
+  assertCreateInParent,
+  assertDelete,
+  assertReadDir,
+  assertReadText,
+  assertRenamePath,
+  assertSaveImageBaseDir,
+  assertStatAllowed,
+  assertWatch,
+  assertWriteText,
+  assertImageBufferMatchesExt,
+  existsWithPermission,
+  readDocumentImageForExport,
+} from '../security/fileAccess'
 
 export interface FileTreeNode {
   name: string
   path: string
   isDirectory: boolean
-  children?: FileTreeNode[]
 }
 
 const fileWatchers = new Map<string, FSWatcher>()
-const allowedPaths = new Set<string>()
-
-export function addAllowedPath(dirPath: string) {
-  allowedPaths.add(resolve(dirPath))
-}
-
-function isPathAllowed(targetPath: string): boolean {
-  if (allowedPaths.size === 0) return false
-  const normalizedTarget = resolve(targetPath)
-  for (const allowed of allowedPaths) {
-    const rel = relative(allowed, normalizedTarget)
-    if (rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))) {
-      return true
-    }
-  }
-  return false
-}
-
-function validatePath(targetPath: string): string {
-  const resolved = resolve(targetPath)
-  if (!isPathAllowed(resolved)) {
-    throw new Error(`Access denied: ${resolved}`)
-  }
-  return resolved
-}
+const MAX_PASTE_IMAGE_BYTES = 10 * 1024 * 1024
 
 export function registerFileIpcHandlers() {
-  ipcMain.handle('file:grantAccess', (_event, targetPath: string): boolean => {
-    const safeTarget = resolve(targetPath)
-    addAllowedPath(safeTarget)
-    addAllowedPath(dirname(safeTarget))
-    return true
-  })
-
   ipcMain.handle('file:read', async (_event, filePath: string): Promise<string> => {
-    const safePath = validatePath(filePath)
-    const content = await readFile(safePath, 'utf-8')
-    return content
+    const safePath = assertReadText(filePath)
+    return await readFile(safePath, 'utf-8')
   })
 
-  ipcMain.handle('file:readBinary', async (_event, filePath: string): Promise<Uint8Array> => {
-    const safePath = validatePath(filePath)
-    const content = await readFile(safePath)
-    return new Uint8Array(content)
+  ipcMain.handle('file:readDocumentImage', async (_event, sourceMarkdownPath: string | null, imageSrc: string) => {
+    return readDocumentImageForExport(sourceMarkdownPath, imageSrc)
   })
 
   ipcMain.handle('file:write', async (_event, filePath: string, content: string): Promise<boolean> => {
-    const safePath = validatePath(filePath)
+    const safePath = assertWriteText(filePath)
     await writeFile(safePath, content, 'utf-8')
     return true
   })
 
   ipcMain.handle('file:readDir', async (_event, dirPath: string): Promise<FileTreeNode[]> => {
-    const safePath = validatePath(dirPath)
+    const safePath = assertReadDir(dirPath)
     return await readDirectoryTree(safePath)
   })
 
   ipcMain.handle('file:stat', async (_event, filePath: string) => {
-    const safePath = validatePath(filePath)
+    const safePath = await assertStatAllowed(filePath)
     const stats = await stat(safePath)
     return {
       isDirectory: stats.isDirectory(),
@@ -80,36 +59,33 @@ export function registerFileIpcHandlers() {
   })
 
   ipcMain.handle('file:exists', async (_event, filePath: string): Promise<boolean> => {
-    try {
-      const safePath = validatePath(filePath)
-      await access(safePath)
-      return true
-    } catch {
-      return false
-    }
+    return existsWithPermission(filePath)
   })
 
   ipcMain.handle('file:createFile', async (_event, filePath: string, content: string = ''): Promise<boolean> => {
-    const safePath = validatePath(filePath)
-    await writeFile(safePath, content, 'utf-8')
+    const safe = resolve(filePath)
+    assertCreateInParent(safe)
+    assertWriteText(safe)
+    await writeFile(safe, content, 'utf-8')
     return true
   })
 
   ipcMain.handle('file:createDir', async (_event, dirPath: string): Promise<boolean> => {
-    const safePath = validatePath(dirPath)
-    await mkdir(safePath, { recursive: true })
+    const resolved = resolve(dirPath)
+    assertCreateInParent(resolved)
+    await mkdir(resolved, { recursive: true })
     return true
   })
 
   ipcMain.handle('file:rename', async (_event, oldPath: string, newPath: string): Promise<boolean> => {
-    const safeOld = validatePath(oldPath)
-    const safeNew = validatePath(newPath)
+    const safeOld = assertRenamePath(oldPath)
+    const safeNew = assertRenamePath(newPath)
     await rename(safeOld, safeNew)
     return true
   })
 
   ipcMain.handle('file:delete', async (_event, filePath: string): Promise<boolean> => {
-    const safePath = validatePath(filePath)
+    const safePath = assertDelete(filePath)
     const stats = await stat(safePath)
     if (stats.isDirectory()) {
       await rm(safePath, { recursive: true, force: true })
@@ -120,19 +96,27 @@ export function registerFileIpcHandlers() {
   })
 
   ipcMain.handle('file:saveImage', async (_event, dirPath: string, fileName: string, buffer: Uint8Array): Promise<string> => {
-    const safeDirPath = validatePath(dirPath)
+    if (buffer.length > MAX_PASTE_IMAGE_BYTES) {
+      throw new Error('Image too large')
+    }
+    const safeDirPath = assertSaveImageBaseDir(dirPath)
     const sanitizedFileName = fileName.replace(/[/\\]/g, '').replace(/\.\./g, '')
     if (!sanitizedFileName) throw new Error('Invalid file name')
+    const lower = sanitizedFileName.toLowerCase()
+    if (!/\.(png|jpe?g|gif|webp)$/i.test(lower)) {
+      throw new Error('Invalid image extension')
+    }
+    assertImageBufferMatchesExt(buffer, sanitizedFileName)
     const imagesDir = join(safeDirPath, 'images')
     await mkdir(imagesDir, { recursive: true })
     const filePath = join(imagesDir, sanitizedFileName)
-    validatePath(filePath)
+    assertWriteText(filePath)
     await writeFile(filePath, Buffer.from(buffer))
     return filePath
   })
 
   ipcMain.handle('file:watch', (_event, filePath: string) => {
-    const safePath = validatePath(filePath)
+    const safePath = assertWatch(filePath)
     if (fileWatchers.has(safePath)) return
 
     try {
@@ -149,7 +133,7 @@ export function registerFileIpcHandlers() {
   })
 
   ipcMain.handle('file:unwatch', (_event, filePath: string) => {
-    const safePath = validatePath(filePath)
+    const safePath = assertWatch(filePath)
     const watcher = fileWatchers.get(safePath)
     if (watcher) {
       watcher.close()

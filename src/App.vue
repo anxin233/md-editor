@@ -7,6 +7,11 @@ import { useEditorStore } from '@/stores/editor'
 import { initShiki } from '@/utils/shiki'
 import { exportToHtml, exportToPdf, exportToWord } from '@/utils/export'
 import { listenAppCommand, type AppCommandDetail } from '@/utils/appCommands'
+import {
+  findShortcutDefinitionByChord,
+  normalizeKeyboardChord,
+  type ShortcutDefinition,
+} from '@/utils/shortcutRegistry'
 
 const settingsStore = useSettingsStore()
 const fileStore = useFileStore()
@@ -17,6 +22,7 @@ let keydownHandler: ((e: KeyboardEvent) => void) | null = null
 let autoSaveTimer: ReturnType<typeof setInterval> | null = null
 let ctrlTabCleanup: (() => void) | null = null
 let appCommandCleanup: (() => void) | null = null
+let preserveWysiwygTimer: ReturnType<typeof setTimeout> | null = null
 
 onMounted(async () => {
   await settingsStore.initSettings()
@@ -33,6 +39,7 @@ onMounted(async () => {
 onUnmounted(() => {
   fileStore.cleanupWatchers()
   clearAutoSaveTimer()
+  clearPreserveWysiwygTimer()
   if (keydownHandler) {
     window.removeEventListener('keydown', keydownHandler)
   }
@@ -51,6 +58,13 @@ function clearAutoSaveTimer() {
   if (autoSaveTimer) {
     clearInterval(autoSaveTimer)
     autoSaveTimer = null
+  }
+}
+
+function clearPreserveWysiwygTimer() {
+  if (preserveWysiwygTimer) {
+    clearTimeout(preserveWysiwygTimer)
+    preserveWysiwygTimer = null
   }
 }
 
@@ -92,94 +106,39 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
 
 function setupKeyboardShortcuts() {
   keydownHandler = async (e: KeyboardEvent) => {
-    const ctrl = e.ctrlKey || e.metaKey
+    const chord = normalizeKeyboardChord(e)
+    const def = findShortcutDefinitionByChord(chord)
+    if (!def) return
+    e.preventDefault()
+    await dispatchShortcut(def, e)
+  }
+  window.addEventListener('keydown', keydownHandler)
+}
 
-    if (ctrl && e.key === 'n') {
-      e.preventDefault()
-      fileStore.createNewTab()
-    }
-
-    if (ctrl && e.key === 'o') {
-      e.preventDefault()
-      await openFileFromDialog()
-    }
-
-    if (ctrl && (e.key === 'f' || e.key === 'F')) {
-      e.preventDefault()
-      await openSearchPanel('find')
-    }
-
-    if (ctrl && (e.key === 'h' || e.key === 'H')) {
-      e.preventDefault()
-      await openSearchPanel('replace')
-    }
-
-    if (ctrl && e.key === 's') {
-      e.preventDefault()
-      await saveCurrentFile(e.shiftKey)
-    }
-
-    if (ctrl && e.key === 'w') {
-      e.preventDefault()
-      if (fileStore.activeTabId) {
-        await confirmCloseTab(fileStore.activeTabId)
-      }
-    }
-
-    if (ctrl && e.key === 'e') {
-      e.preventDefault()
+async function dispatchShortcut(def: ShortcutDefinition, _e: KeyboardEvent) {
+  if (def.action.kind === 'external') return
+  if (def.dispatchMode === 'main-process') return
+  if (def.action.kind === 'command') {
+    await handleAppCommand(def.action.command)
+    return
+  }
+  switch (def.action.id) {
+    case 'cycle-editor-mode': {
       const modes: Array<'wysiwyg' | 'split' | 'source'> = ['wysiwyg', 'split', 'source']
       const idx = modes.indexOf(settingsStore.editorMode)
       settingsStore.setEditorMode(modes[(idx + 1) % modes.length])
+      return
     }
-
-    if (ctrl && e.key === 't') {
-      e.preventDefault()
-      appLayoutRef.value?.openTableEditor()
-    }
-
-    if (ctrl && e.key === '\\') {
-      e.preventDefault()
-      settingsStore.toggleToc()
-    }
-
-    if (ctrl && e.shiftKey && e.key === 'F') {
-      e.preventDefault()
-      settingsStore.toggleFocusMode()
-    }
-
-    if (ctrl && e.shiftKey && (e.key === 'B' || e.key === 'b')) {
-      e.preventDefault()
-      settingsStore.toggleSidebar()
-    }
-
-    if (ctrl && e.key === '=') {
-      e.preventDefault()
-      settingsStore.setFontSize(settingsStore.fontSize + 1)
-    }
-
-    if (ctrl && e.key === '-') {
-      e.preventDefault()
-      settingsStore.setFontSize(settingsStore.fontSize - 1)
-    }
-
-    if (ctrl && e.key === '0') {
-      e.preventDefault()
-      settingsStore.setFontSize(16)
-    }
-
-    if (ctrl && e.shiftKey && e.key === 'P') {
-      e.preventDefault()
+    case 'close-current-tab':
+      if (fileStore.activeTabId) {
+        await confirmCloseTab(fileStore.activeTabId)
+      }
+      return
+    case 'cycle-theme':
       settingsStore.cycleTheme()
-    }
-
-    if (ctrl && !e.shiftKey && !e.altKey && e.key >= '1' && e.key <= '6') {
-      e.preventDefault()
-      editorStore.requestHeading(parseInt(e.key))
-    }
-
+      return
+    default:
   }
-  window.addEventListener('keydown', keydownHandler)
 }
 
 function setupCtrlTab() {
@@ -255,6 +214,28 @@ async function openSearchPanel(mode: 'find' | 'replace') {
   editorStore.requestSearch(mode)
 }
 
+async function requestWysiwygFormatCommand(command: string) {
+  const previousMode = settingsStore.editorMode
+  clearPreserveWysiwygTimer()
+  if (previousMode === 'wysiwyg') {
+    preserveWysiwygTimer = setTimeout(() => {
+      preserveWysiwygTimer = null
+    }, 400)
+  }
+  editorStore.requestFormat(command)
+
+  await nextTick()
+  if (previousMode === 'wysiwyg' && settingsStore.editorMode === 'source') {
+    settingsStore.setEditorMode('wysiwyg')
+  }
+}
+
+watch(() => settingsStore.editorMode, (mode) => {
+  if (mode === 'source' && preserveWysiwygTimer) {
+    settingsStore.setEditorMode('wysiwyg')
+  }
+})
+
 async function exportCurrentFile(format: 'pdf' | 'html' | 'word') {
   const tab = fileStore.activeTab
   if (!tab) return
@@ -297,6 +278,16 @@ async function handleAppCommand(command: AppCommandDetail) {
       return
     case 'edit:replace':
       await openSearchPanel('replace')
+      return
+    case 'paragraph:heading':
+      editorStore.requestHeading(command.level)
+      return
+    case 'format':
+      if (command.command === 'table') {
+        appLayoutRef.value?.openTableEditor()
+      } else {
+        await requestWysiwygFormatCommand(command.command)
+      }
       return
     case 'view:set-mode':
       settingsStore.setEditorMode(command.mode)
