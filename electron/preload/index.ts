@@ -18,6 +18,19 @@ export interface FileChangeEvent {
   eventType: string
 }
 
+export type UpdateStatus =
+  | { state: 'checking' }
+  | { state: 'latest' }
+  | { state: 'available'; version?: string }
+  | { state: 'downloading'; percent: number }
+  | { state: 'downloaded'; version?: string }
+  | { state: 'error'; message: string }
+  | { state: 'disabled'; message?: string }
+
+export type UpdateCheckInvokeResult =
+  | { state: 'checking' }
+  | { state: 'disabled'; message?: string }
+
 export interface ElectronAPI {
   getAppVersion: () => Promise<string>
   openExternal: (url: string) => Promise<void>
@@ -69,6 +82,11 @@ export interface ElectronAPI {
     pdf: (htmlContent: string, defaultName?: string) => Promise<boolean>
     html: (htmlContent: string, defaultName?: string) => Promise<boolean>
     word: (docxBuffer: Uint8Array, defaultName?: string) => Promise<boolean>
+  }
+  update: {
+    check: () => Promise<UpdateCheckInvokeResult>
+    install: () => Promise<void>
+    onStatus: (callback: (status: UpdateStatus) => void) => () => void
   }
   onCtrlTab: (callback: (isShift: boolean) => void) => () => void
 }
@@ -125,6 +143,15 @@ const electronAPI: ElectronAPI = {
     pdf: (htmlContent: string, defaultName?: string) => ipcRenderer.invoke('export:pdf', htmlContent, defaultName),
     html: (htmlContent: string, defaultName?: string) => ipcRenderer.invoke('export:html', htmlContent, defaultName),
     word: (docxBuffer: Uint8Array, defaultName?: string) => ipcRenderer.invoke('export:word', docxBuffer, defaultName),
+  },
+  update: {
+    check: () => ipcRenderer.invoke('update:check'),
+    install: () => ipcRenderer.invoke('update:install'),
+    onStatus: (callback: (status: UpdateStatus) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: UpdateStatus) => callback(data)
+      ipcRenderer.on('update:status', handler)
+      return () => ipcRenderer.removeListener('update:status', handler)
+    },
   },
   onCtrlTab: (callback: (isShift: boolean) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, isShift: boolean) => callback(isShift)

@@ -7,14 +7,17 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && electron-builder",
-    "build:win": "vite build && electron-builder --win",
-    "build:mac": "vite build && electron-builder --mac",
-    "build:linux": "vite build && electron-builder --linux",
-    "build:portable": "vite build && electron-builder --win portable",
+    "build": "tsx --tsconfig tsconfig.json scripts/bump-version-pack.ts && vite build && electron-builder",
+    "build:win": "tsx --tsconfig tsconfig.json scripts/bump-version-pack.ts && vite build && electron-builder --win",
+    "build:mac": "tsx --tsconfig tsconfig.json scripts/bump-version-pack.ts && vite build && electron-builder --mac",
+    "build:linux": "tsx --tsconfig tsconfig.json scripts/bump-version-pack.ts && vite build && electron-builder --linux",
+    "build:portable": "tsx --tsconfig tsconfig.json scripts/bump-version-pack.ts && vite build && electron-builder --win portable",
     "preview": "vite preview",
     "type-check": "vue-tsc --noEmit",
-    "docs:shortcuts": "tsx --tsconfig tsconfig.json scripts/update-readme-shortcuts.ts"
+    "docs:shortcuts": "tsx --tsconfig tsconfig.json scripts/update-readme-shortcuts.ts",
+    "version:bump-pack": "tsx --tsconfig tsconfig.json scripts/bump-version-pack.ts",
+    "release:win": "tsx --tsconfig tsconfig.json scripts/bump-version-pack.ts && vite build && electron-builder --win --publish always",
+    "release:win:draft": "tsx --tsconfig tsconfig.json scripts/bump-version-pack.ts && vite build && electron-builder --win --publish onTagOrDraft"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.1",
@@ -37,6 +40,7 @@
     "@milkdown/utils": "^7.19.2",
     "@milkdown/vue": "^7.19.2",
     "codemirror": "^6.0.2",
+    "electron-updater": "^6.8.3",
     "html-to-docx": "^1.8.0",
     "katex": "^0.16.40",
     "markdown-it": "^14.1.1",
@@ -133,6 +137,14 @@
       ],
       "category": "Office",
       "artifactName": "${productName}-${version}-linux.${ext}"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "anxin233",
+        "repo": "md-editor",
+        "releaseType": "release"
+      }
+    ]
   }
 }

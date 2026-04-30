@@ -5,6 +5,7 @@ import { useFileStore } from '@/stores/file'
 import type { AppCommandDetail } from '@/utils/appCommands'
 import { dispatchAppCommand } from '@/utils/appCommands'
 import { shortcutDisplayForAppCommand, shortcutDisplayById, shortcutsForHelpDialog } from '@/utils/shortcutRegistry'
+import type { UpdateStatus } from '@preload/index'
 
 const settingsStore = useSettingsStore()
 const fileStore = useFileStore()
@@ -15,13 +16,16 @@ const appVersion = ref('1.0.1')
 const showShortcutDialog = ref(false)
 const showAboutDialog = ref(false)
 const showUpdateDialog = ref(false)
-const updateState = ref<'idle' | 'checking' | 'latest' | 'available' | 'error'>('idle')
+const updateState = ref<
+  'idle' | 'checking' | 'latest' | 'available' | 'downloading' | 'downloaded' | 'error' | 'disabled'
+>('idle')
 const latestVersion = ref('')
-const latestReleaseUrl = ref('')
-const latestReleaseNotes = ref('')
 const updateError = ref('')
+const updateProgress = ref(0)
 
 const GITHUB_REPO = 'anxin233/md-editor'
+
+let updateStatusUnsub: (() => void) | null = null
 
 const recentFiles = computed(() => settingsStore.recentFiles.slice(0, 8))
 
@@ -111,56 +115,40 @@ function openAbout() {
   showAboutDialog.value = true
 }
 
-function compareVersions(current: string, latest: string): number {
-  const a = current.replace(/^v/, '').split('.').map(Number)
-  const b = latest.replace(/^v/, '').split('.').map(Number)
-  for (let i = 0; i < Math.max(a.length, b.length); i++) {
-    const diff = (b[i] || 0) - (a[i] || 0)
-    if (diff !== 0) return diff
-  }
-  return 0
+function formatVersion(version: string) {
+  const v = version.replace(/^v/i, '').trim()
+  return v ? `v${v}` : ''
 }
 
 async function checkUpdates() {
   closeMenu()
   showUpdateDialog.value = true
-  updateState.value = 'checking'
   updateError.value = ''
+  updateProgress.value = 0
+  updateState.value = 'checking'
+  latestVersion.value = ''
 
-  try {
-    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
-      headers: { 'Accept': 'application/vnd.github.v3+json' },
-    })
-
-    if (!res.ok) {
-      if (res.status === 404) {
-        updateState.value = 'error'
-        updateError.value = '\u5c1a\u672a\u53d1\u5e03\u4efb\u4f55 Release'
-        return
-      }
-      throw new Error(`GitHub API \u8fd4\u56de ${res.status}`)
-    }
-
-    const data = await res.json()
-    const tagName: string = data.tag_name || ''
-    latestVersion.value = tagName
-    latestReleaseUrl.value = data.html_url || `https://github.com/${GITHUB_REPO}/releases/latest`
-    latestReleaseNotes.value = data.name || tagName
-
-    if (compareVersions(appVersion.value, tagName) > 0) {
-      updateState.value = 'available'
-    } else {
-      updateState.value = 'latest'
-    }
-  } catch (err: any) {
+  const upd = window.electronAPI?.update
+  if (!upd) {
     updateState.value = 'error'
-    updateError.value = err?.message || '\u7f51\u7edc\u8bf7\u6c42\u5931\u8d25'
+    updateError.value = '当前环境不支持自动更新'
+    return
+  }
+
+  const result = await upd.check()
+  if (result.state === 'disabled') {
+    updateState.value = 'disabled'
+    updateError.value = result.message || '自动更新不可用'
+    return
   }
 }
 
-function openReleasePage() {
-  const url = latestReleaseUrl.value || `https://github.com/${GITHUB_REPO}/releases`
-  window.electronAPI?.openExternal(url)
+function installUpdate() {
+  window.electronAPI?.update.install()
+}
+
+function deferInstallUpdate() {
+  showUpdateDialog.value = false
 }
 
 function openAllReleases() {
@@ -173,12 +161,45 @@ onMounted(() => {
   window.addEventListener('resize', checkMaximized)
   window.addEventListener('mousedown', onGlobalPointerDown)
   window.addEventListener('keydown', onGlobalKeyDown)
+
+  updateStatusUnsub = window.electronAPI?.update?.onStatus((status: UpdateStatus) => {
+    switch (status.state) {
+      case 'checking':
+        updateState.value = 'checking'
+        break
+      case 'latest':
+        updateState.value = 'latest'
+        break
+      case 'available':
+        if (status.version) latestVersion.value = formatVersion(status.version)
+        updateState.value = 'available'
+        break
+      case 'downloading':
+        updateProgress.value = Math.min(100, Math.round(status.percent))
+        updateState.value = 'downloading'
+        break
+      case 'downloaded':
+        if (status.version) latestVersion.value = formatVersion(status.version)
+        updateState.value = 'downloaded'
+        break
+      case 'error':
+        updateError.value = status.message || '更新出错'
+        updateState.value = 'error'
+        break
+      case 'disabled':
+        updateError.value = status.message || ''
+        updateState.value = 'disabled'
+        break
+    }
+  }) ?? null
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkMaximized)
   window.removeEventListener('mousedown', onGlobalPointerDown)
   window.removeEventListener('keydown', onGlobalKeyDown)
+  updateStatusUnsub?.()
+  updateStatusUnsub = null
 })
 </script>
 
@@ -547,15 +568,37 @@ onUnmounted(() => {
 
           <div v-else-if="updateState === 'available'" class="update-available">
             <p>发现新版本：<strong>{{ latestVersion }}</strong></p>
-            <p v-if="latestReleaseNotes && latestReleaseNotes !== latestVersion" class="update-notes">{{ latestReleaseNotes }}</p>
-            <button class="update-btn" @click="openReleasePage">前往下载</button>
+            <p class="update-notes">正在下载更新...</p>
+          </div>
+
+          <div v-else-if="updateState === 'downloading'" class="update-available">
+            <p v-if="latestVersion">新版本 {{ latestVersion }}</p>
+            <div class="update-progress-row">
+              <div class="update-progress-track">
+                <div class="update-progress-fill" :style="{ width: updateProgress + '%' }"></div>
+              </div>
+              <span class="update-progress-text">{{ updateProgress }}%</span>
+            </div>
+          </div>
+
+          <div v-else-if="updateState === 'downloaded'" class="update-available">
+            <p>新版本 <strong>{{ latestVersion }}</strong> 已下载完成。</p>
+            <p class="update-notes">退出应用时将自动安装；也可点击下方立即重启完成安装。</p>
+            <div class="update-actions">
+              <button type="button" class="update-btn update-btn-secondary" @click="deferInstallUpdate">稍后</button>
+              <button type="button" class="update-btn" @click="installUpdate">立即重启安装</button>
+            </div>
+          </div>
+
+          <div v-else-if="updateState === 'disabled'" class="update-status update-error">
+            <span>{{ updateError || '自动更新不可用' }}</span>
           </div>
 
           <div v-else-if="updateState === 'error'" class="update-status update-error">
-            <span>检查失败：{{ updateError }}</span>
+            <span>更新失败：{{ updateError }}</span>
           </div>
 
-          <button class="update-link" @click="openAllReleases">查看所有版本</button>
+          <button type="button" class="update-link" @click="openAllReleases">查看所有版本</button>
         </div>
       </div>
     </div>
@@ -926,6 +969,52 @@ onUnmounted(() => {
 
 .update-btn:hover {
   background: var(--accent-hover);
+}
+
+.update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.update-btn-secondary {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.update-btn-secondary:hover {
+  background: var(--border-color);
+}
+
+.update-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.update-progress-track {
+  flex: 1;
+  min-width: 0;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--border-color);
+  overflow: hidden;
+}
+
+.update-progress-fill {
+  height: 100%;
+  background: var(--accent-color);
+  border-radius: 4px;
+  transition: width 0.15s ease-out;
+}
+
+.update-progress-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  min-width: 3ch;
+  text-align: right;
 }
 
 .update-link {

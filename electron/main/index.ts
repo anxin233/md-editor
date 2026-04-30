@@ -7,6 +7,7 @@ import { registerDialogIpcHandlers } from './ipc/dialog.ipc'
 import { registerExportIpcHandlers } from './ipc/export.ipc'
 import { registerRecentIpcHandlers } from './ipc/recent.ipc'
 import { registerSettingsIpcHandlers } from './ipc/settings.ipc'
+import { registerUpdateIpcHandlers, attachUpdateTargetWindow } from './ipc/update.ipc'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -82,7 +83,10 @@ const createWindow = () => {
 
   mainWindow.on('closed', () => {
     mainWindow = null
+    attachUpdateTargetWindow(null)
   })
+
+  attachUpdateTargetWindow(mainWindow)
 }
 
 app.whenReady().then(() => {
@@ -91,6 +95,7 @@ app.whenReady().then(() => {
   registerExportIpcHandlers()
   registerRecentIpcHandlers()
   registerSettingsIpcHandlers()
+  registerUpdateIpcHandlers()
   registerWindowIpcHandlers()
   createWindow()
 
