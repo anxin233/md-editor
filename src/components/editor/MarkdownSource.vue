@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, shallowRef } from 'vue'
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, rectangularSelection, crosshairCursor, highlightSpecialChars } from '@codemirror/view'
-import { EditorState, Compartment } from '@codemirror/state'
+import { EditorState, Compartment, EditorSelection } from '@codemirror/state'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
@@ -12,6 +12,8 @@ import { tags } from '@lezer/highlight'
 import { useSettingsStore } from '@/stores/settings'
 import { useEditorStore } from '@/stores/editor'
 import { useFileStore } from '@/stores/file'
+import { useContextMenuStore } from '@/stores/contextMenu'
+import { buildTyporaCodeMirrorMenu } from '@/utils/editorContextMenu'
 
 const props = defineProps<{
   modelValue: string
@@ -25,6 +27,7 @@ const emit = defineEmits<{
 const settingsStore = useSettingsStore()
 const editorStore = useEditorStore()
 const fileStore = useFileStore()
+const contextMenuStore = useContextMenuStore()
 const editorRef = ref<HTMLDivElement>()
 const view = shallowRef<EditorView>()
 const themeCompartment = new Compartment()
@@ -268,6 +271,27 @@ function createEditor() {
             }
           }
           return false
+        },
+        contextmenu: (event, editorView) => {
+          event.preventDefault()
+          const cx = editorView.posAtCoords({ x: event.clientX, y: event.clientY })
+          const clickPos = cx ?? editorView.state.selection.main.head
+
+          const sel = editorView.state.selection.main
+          if (!sel.empty) {
+            if (clickPos < sel.from || clickPos > sel.to) {
+              editorView.dispatch({ selection: EditorSelection.cursor(clickPos) })
+            }
+          } else {
+            editorView.dispatch({ selection: EditorSelection.cursor(clickPos) })
+          }
+
+          contextMenuStore.show({
+            clientX: event.clientX,
+            clientY: event.clientY,
+            items: buildTyporaCodeMirrorMenu(editorView, clickPos),
+          })
+          return true
         },
       }),
       EditorView.lineWrapping,

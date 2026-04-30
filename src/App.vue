@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import ContextMenu from '@/components/common/ContextMenu.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useFileStore } from '@/stores/file'
 import { useEditorStore } from '@/stores/editor'
@@ -338,4 +339,5 @@ defineExpose({ saveCurrentFile, confirmCloseTab, openFileFromDialog, openFolderF
 
 <template>
   <AppLayout ref="appLayoutRef" />
+  <ContextMenu />
 </template>

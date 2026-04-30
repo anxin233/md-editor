@@ -2,10 +2,11 @@
 import { watch } from 'vue'
 import { useEditor, useInstance } from '@milkdown/vue'
 import { Editor, rootCtx, defaultValueCtx, editorViewCtx, commandsCtx } from '@milkdown/core'
-import type { Node as ProseNode, NodeType, ResolvedPos } from '@milkdown/prose/model'
+import type { Node as ProseNode, NodeType, ResolvedPos, MarkType } from '@milkdown/prose/model'
+import type { EditorView as ProseMirrorEditorView } from '@milkdown/prose/view'
 import { lift } from '@milkdown/prose/commands'
 import { liftListItem } from '@milkdown/prose/schema-list'
-import { TextSelection, EditorState } from '@milkdown/prose/state'
+import { TextSelection, EditorState, type Transaction } from '@milkdown/prose/state'
 import { replaceAll, $markSchema, $remark } from '@milkdown/utils'
 import {
   commonmark,
@@ -22,6 +23,18 @@ import { indent } from '@milkdown/plugin-indent'
 import { trailing } from '@milkdown/plugin-trailing'
 import { Milkdown } from '@milkdown/vue'
 import { useEditorStore } from '@/stores/editor'
+import type { MarkdownTableAlignment } from '@/utils/markdownTable'
+import {
+  resolvePmTableTarget,
+  insertPmTableRowAbove,
+  insertPmTableRowBelow,
+  deletePmTableRow,
+  insertPmTableColumnLeft,
+  insertPmTableColumnRight,
+  deletePmTableColumn,
+  setPmTableColumnAlignment,
+  type PmTableTarget,
+} from '@/utils/proseMirrorTable'
 
 const editorStore = useEditorStore()
 
@@ -833,7 +846,65 @@ function showCommentUnsupportedInWysiwyg() {
   editorStore.showStatusToast('注释命令建议仅在源码模式使用（WYSIWYG 下避免重复文本误改）')
 }
 
-function handleFormatCommand(command: string, data?: string) {
+function expandActiveMarkRange(state: EditorState, pos: number, markType: MarkType): { from: number; to: number } | null {
+  const $pos = state.doc.resolve(pos)
+  if (!markType.isInSet($pos.marks())) return null
+  let start = pos
+  let end = pos
+  while (start > 0) {
+    const m = state.doc.resolve(start - 1).marks()
+    if (!markType.isInSet(m)) break
+    start--
+  }
+  while (end < state.doc.content.size) {
+    const m = state.doc.resolve(end).marks()
+    if (!markType.isInSet(m)) break
+    end++
+  }
+  return { from: start, to: end }
+}
+
+function runPmTableCommand(fn: (state: EditorState, target: PmTableTarget) => Transaction | null) {
+  const editor = getEditor()
+  if (!editor || loading.value) return
+  editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx)
+    const target = resolvePmTableTarget(view.state, view.state.selection.from)
+    if (!target) {
+      editorStore.showStatusToast('无法定位表格单元格')
+      return
+    }
+    const tr = fn(view.state, target)
+    if (!tr) {
+      editorStore.showStatusToast('表格操作无法完成')
+      return
+    }
+    view.dispatch(tr.scrollIntoView())
+    view.focus()
+  })
+}
+
+function runPmTableAlign(alignment: MarkdownTableAlignment) {
+  const editor = getEditor()
+  if (!editor || loading.value) return
+  editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx)
+    const target = resolvePmTableTarget(view.state, view.state.selection.from)
+    if (!target) {
+      editorStore.showStatusToast('无法定位表格单元格')
+      return
+    }
+    const tr = setPmTableColumnAlignment(view.state, target, alignment)
+    if (!tr) {
+      editorStore.showStatusToast('无法设置列对齐')
+      return
+    }
+    view.dispatch(tr.scrollIntoView())
+    view.focus()
+  })
+}
+
+function handleFormatCommand(command: string, data?: string, pmRange?: { from: number; to: number }) {
   switch (command) {
     case 'table-insert':
       if (data) {
@@ -858,6 +929,173 @@ function handleFormatCommand(command: string, data?: string) {
     case 'hyperlink':
       insertHyperlinkMark()
       break
+    case 'edit-hyperlink': {
+      const editor = getEditor()
+      if (!editor || loading.value) break
+      editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx)
+        const linkType = view.state.schema.marks.link
+        if (!linkType) return
+        const range = pmRange
+          ?? expandActiveMarkRange(view.state, view.state.selection.from, linkType)
+        if (!range) {
+          editorStore.showStatusToast('请将光标放在链接文字内')
+          return
+        }
+        let current = ''
+        view.state.doc.nodesBetween(range.from, range.to, (node) => {
+          if (!node.isText) return
+          for (let i = 0; i < node.marks.length; i++) {
+            const mk = node.marks[i]
+            if (mk.type === linkType && typeof mk.attrs.href === 'string') current = mk.attrs.href as string
+          }
+        })
+        const next =
+          typeof window !== 'undefined' ? window.prompt('链接地址', current || 'https://') : null
+        if (next === null) return
+        const normalized = next.trim()
+        if (!normalized) {
+          editorStore.showStatusToast('链接地址不能为空')
+          return
+        }
+        const tr = view.state.tr
+          .setSelection(TextSelection.create(view.state.doc, range.from, range.to))
+          .removeMark(range.from, range.to, linkType)
+          .addMark(range.from, range.to, linkType.create({ href: normalized, title: null }))
+        view.dispatch(tr.scrollIntoView())
+        view.focus()
+      })
+      break
+    }
+    case 'unlink-hyperlink': {
+      const editor = getEditor()
+      if (!editor || loading.value) break
+      editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx)
+        const linkType = view.state.schema.marks.link
+        if (!linkType) return
+        const range = pmRange
+          ?? expandActiveMarkRange(view.state, view.state.selection.from, linkType)
+          ?? { from: view.state.selection.from, to: view.state.selection.to }
+        view.dispatch(view.state.tr.removeMark(range.from, range.to, linkType))
+        view.focus()
+      })
+      break
+    }
+    case 'delete-code-block': {
+      const editor = getEditor()
+      if (!editor || loading.value) break
+      editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx)
+        const { state } = view
+        if (pmRange) {
+          view.dispatch(state.tr.delete(pmRange.from, pmRange.to))
+          view.focus()
+          return
+        }
+        const $from = state.selection.$from
+        for (let d = $from.depth; d > 0; d--) {
+          if ($from.node(d).type.name === 'code_block') {
+            const delFrom = $from.before(d)
+            const delTo = $from.after(d)
+            view.dispatch(state.tr.delete(delFrom, delTo))
+            view.focus()
+            return
+          }
+        }
+      })
+      break
+    }
+    case 'delete-table': {
+      const editor = getEditor()
+      if (!editor || loading.value) break
+      editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx)
+        const { state } = view
+        if (pmRange) {
+          view.dispatch(state.tr.delete(pmRange.from, pmRange.to))
+          view.focus()
+          return
+        }
+        const $from = state.selection.$from
+        for (let d = $from.depth; d > 0; d--) {
+          if ($from.node(d).type.name === 'table') {
+            const delFrom = $from.before(d)
+            const delTo = $from.after(d)
+            view.dispatch(state.tr.delete(delFrom, delTo))
+            view.focus()
+            return
+          }
+        }
+      })
+      break
+    }
+    case 'table-row-insert-above':
+      runPmTableCommand((s, t) => insertPmTableRowAbove(s, t))
+      break
+    case 'table-row-insert-below':
+      runPmTableCommand((s, t) => insertPmTableRowBelow(s, t))
+      break
+    case 'table-row-delete':
+      runPmTableCommand((s, t) => deletePmTableRow(s, t))
+      break
+    case 'table-column-insert-left':
+      runPmTableCommand((s, t) => insertPmTableColumnLeft(s, t))
+      break
+    case 'table-column-insert-right':
+      runPmTableCommand((s, t) => insertPmTableColumnRight(s, t))
+      break
+    case 'table-column-delete':
+      runPmTableCommand((s, t) => deletePmTableColumn(s, t))
+      break
+    case 'table-align-default':
+      runPmTableAlign('default')
+      break
+    case 'table-align-left':
+      runPmTableAlign('left')
+      break
+    case 'table-align-center':
+      runPmTableAlign('center')
+      break
+    case 'table-align-right':
+      runPmTableAlign('right')
+      break
+    case 'delete-image': {
+      const editor = getEditor()
+      if (!editor || loading.value) break
+      editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx)
+        const { state } = view
+        if (pmRange) {
+          view.dispatch(state.tr.delete(pmRange.from, pmRange.to))
+          view.focus()
+          return
+        }
+        const $from = state.selection.$from
+        for (let d = $from.depth; d > 0; d--) {
+          if ($from.node(d).type.name === 'image') {
+            const delFrom = $from.before(d)
+            const delTo = $from.after(d)
+            view.dispatch(state.tr.delete(delFrom, delTo))
+            view.focus()
+            return
+          }
+        }
+      })
+      break
+    }
+    case 'wysiwyg-insert-text': {
+      if (data == null) break
+      const ed = getEditor()
+      if (!ed || loading.value) break
+      ed.action((ctx) => {
+        const view = ctx.get(editorViewCtx)
+        const { from, to } = view.state.selection
+        view.dispatch(view.state.tr.insertText(data, from, to).scrollIntoView())
+        view.focus()
+      })
+      break
+    }
     case 'image':
       insertImageNode()
       break
@@ -899,8 +1137,43 @@ watch(() => editorStore.headingRequest, (req) => {
 
 watch(() => editorStore.formatRequest, (req) => {
   if (!req) return
-  handleFormatCommand(req.command, req.data)
+  handleFormatCommand(req.command, req.data, req.pmRange)
   editorStore.clearFormatRequest()
+})
+
+function syncContextMenuSelection(clientX: number, clientY: number) {
+  const editor = getEditor()
+  if (!editor || loading.value) return
+  editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx)
+    const coords = view.posAtCoords({ left: clientX, top: clientY })
+    if (coords == null) return
+    const clickPos = coords.pos
+    const sel = view.state.selection
+    if (!sel.empty) {
+      if (clickPos < sel.from || clickPos > sel.to) {
+        const $pos = view.state.doc.resolve(clickPos)
+        view.dispatch(view.state.tr.setSelection(TextSelection.near($pos)))
+      }
+    } else {
+      const $pos = view.state.doc.resolve(clickPos)
+      view.dispatch(view.state.tr.setSelection(TextSelection.near($pos)))
+    }
+    view.focus()
+  })
+}
+
+defineExpose({
+  getProseMirrorView(): ProseMirrorEditorView | null {
+    const editor = getEditor()
+    if (!editor || loading.value) return null
+    let v: ProseMirrorEditorView | null = null
+    editor.action((ctx) => {
+      v = ctx.get(editorViewCtx)
+    })
+    return v
+  },
+  syncContextMenuSelection,
 })
 </script>
 

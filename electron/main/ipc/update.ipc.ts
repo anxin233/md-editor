@@ -1,5 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
-import { autoUpdater } from 'electron-updater'
+import electronUpdater from 'electron-updater'
+
+const { autoUpdater } = electronUpdater
 
 let targetWindow: BrowserWindow | null = null
 let registered = false
@@ -64,6 +66,6 @@ export function registerUpdateIpcHandlers() {
   })
 
   ipcMain.handle('update:install', () => {
-  autoUpdater.quitAndInstall()
+    autoUpdater.quitAndInstall()
   })
 }

@@ -2,7 +2,9 @@
 import { ref, onMounted, watch, nextTick } from 'vue'
 import { MilkdownProvider } from '@milkdown/vue'
 import MilkdownEditor from './MilkdownEditor.vue'
+import { buildTyporaWysiwygMenu } from '@/utils/editorContextMenu'
 import { useFileStore } from '@/stores/file'
+import { useContextMenuStore } from '@/stores/contextMenu'
 
 const props = defineProps<{
   modelValue: string
@@ -14,6 +16,8 @@ const emit = defineEmits<{
 
 const fileStore = useFileStore()
 const editorRootRef = ref<HTMLDivElement>()
+const milkdownRef = ref<InstanceType<typeof MilkdownEditor>>()
+const contextMenuStore = useContextMenuStore()
 
 function onUpdate(value: string) {
   emit('update:modelValue', value)
@@ -107,6 +111,21 @@ function autoFocus() {
   })
 }
 
+function onEditorContextMenu(e: MouseEvent) {
+  if (!editorRootRef.value?.contains(e.target as Node)) return
+  e.preventDefault()
+  const pmDom = getProseMirror()
+  if (!pmDom) return
+  milkdownRef.value?.syncContextMenuSelection?.(e.clientX, e.clientY)
+  const pmView = milkdownRef.value?.getProseMirrorView?.() ?? null
+  if (!pmView) return
+  contextMenuStore.show({
+    clientX: e.clientX,
+    clientY: e.clientY,
+    items: buildTyporaWysiwygMenu(pmView, pmDom, e),
+  })
+}
+
 onMounted(() => {
   setTimeout(autoFocus, 100)
 })
@@ -124,9 +143,11 @@ watch(() => fileStore.activeTabId, () => {
     @drop.prevent="onDrop"
     @dragover.prevent
     @mousedown="handleEmptyAreaClick"
+    @contextmenu="onEditorContextMenu"
   >
     <MilkdownProvider>
       <MilkdownEditor
+        ref="milkdownRef"
         :modelValue="modelValue"
         @update:modelValue="onUpdate"
       />

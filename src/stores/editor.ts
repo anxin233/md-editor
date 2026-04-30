@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
+/** ProseMirror 文档坐标：右键专项命令优先作用于此区间 */
+export type PmStructuralRange = { from: number; to: number }
+
 export const useEditorStore = defineStore('editor', () => {
   const cursorLine = ref(1)
   const cursorColumn = ref(1)
@@ -11,7 +14,12 @@ export const useEditorStore = defineStore('editor', () => {
   const targetScrollLine = ref<number | null>(null)
   const searchRequest = ref<{ id: number; mode: 'find' | 'replace' } | null>(null)
   const headingRequest = ref<{ id: number; level: number } | null>(null)
-  const formatRequest = ref<{ id: number; command: string; data?: string } | null>(null)
+  const formatRequest = ref<{
+    id: number
+    command: string
+    data?: string
+    pmRange?: PmStructuralRange
+  } | null>(null)
   const statusToast = ref('')
   let statusToastTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -76,8 +84,8 @@ export const useEditorStore = defineStore('editor', () => {
     headingRequest.value = null
   }
 
-  function requestFormat(command: string, data?: string) {
-    formatRequest.value = { id: Date.now(), command, data }
+  function requestFormat(command: string, data?: string, pmRange?: PmStructuralRange) {
+    formatRequest.value = { id: Date.now(), command, data, pmRange }
   }
 
   function clearFormatRequest() {

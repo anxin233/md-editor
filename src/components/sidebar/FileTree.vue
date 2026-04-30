@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import FileTreeItem, { type TreeNode } from './FileTreeItem.vue'
 import { useFileStore } from '@/stores/file'
+import { useContextMenuStore, type ContextMenuEntry } from '@/stores/contextMenu'
 
 const props = defineProps<{
   rootPath: string
@@ -13,11 +14,9 @@ const emit = defineEmits<{
 }>()
 
 const fileStore = useFileStore()
+const contextMenuStore = useContextMenuStore()
 const rootNodes = ref<TreeNode[]>([])
 const treeLoaded = ref(false)
-const contextMenu = ref<{ visible: boolean; x: number; y: number; node: TreeNode | null }>({
-  visible: false, x: 0, y: 0, node: null,
-})
 const isRenaming = ref(false)
 const renameValue = ref('')
 const renameTarget = ref<TreeNode | null>(null)
@@ -47,21 +46,121 @@ function isInvalidNodeName(name: string): boolean {
   return /[\\/]/.test(name) || name === '.' || name === '..'
 }
 
-function onContextMenu(event: MouseEvent, node: TreeNode) {
-  contextMenu.value = { visible: true, x: event.clientX, y: event.clientY, node }
-  window.addEventListener('click', closeContextMenu, { once: true })
+function parentDirOf(filePath: string): string {
+  const i = Math.max(filePath.lastIndexOf('\\'), filePath.lastIndexOf('/'))
+  return i <= 0 ? filePath : filePath.substring(0, i)
 }
 
-function closeContextMenu() {
-  contextMenu.value.visible = false
-}
-
-function startRename() {
-  if (!contextMenu.value.node) return
-  renameTarget.value = contextMenu.value.node
-  renameValue.value = contextMenu.value.node.name
+function beginRename(node: TreeNode) {
+  renameTarget.value = node
+  renameValue.value = node.name
   isRenaming.value = true
-  closeContextMenu()
+}
+
+function beginCreate(type: 'file' | 'dir', node: TreeNode | null) {
+  createParentPath.value = node
+    ? (node.isDirectory ? node.path : parentDirOf(node.path))
+    : props.rootPath
+  isCreating.value = type
+  createValue.value = type === 'file' ? '未命名.md' : '新建文件夹'
+}
+
+function onNodeContextMenu(event: MouseEvent, node: TreeNode) {
+  event.preventDefault()
+  const items: ContextMenuEntry[] = []
+
+  if (!node.isDirectory) {
+    items.push(
+      { id: 'open', label: '打开', action: () => onOpenFile(node.path) },
+      {
+        id: 'rename',
+        label: '重命名',
+        separatorBefore: true,
+        action: () => beginRename(node),
+      },
+      {
+        id: 'del',
+        label: '删除',
+        danger: true,
+        action: () => void deleteNodeAt(node),
+      },
+      {
+        id: 'refresh',
+        label: '刷新',
+        separatorBefore: true,
+        action: () => void loadRoot(props.rootPath),
+      },
+      {
+        id: 'copy',
+        label: '复制路径',
+        action: async () => {
+          try {
+            await navigator.clipboard.writeText(node.path)
+          } catch {
+            // ignore
+          }
+        },
+      },
+    )
+  } else {
+    items.push(
+      { id: 'nf', label: '新建文件', action: () => beginCreate('file', node) },
+      { id: 'nd', label: '新建文件夹', action: () => beginCreate('dir', node) },
+      {
+        id: 'rename',
+        label: '重命名',
+        separatorBefore: true,
+        action: () => beginRename(node),
+      },
+      {
+        id: 'del',
+        label: '删除',
+        danger: true,
+        action: () => void deleteNodeAt(node),
+      },
+      {
+        id: 'refresh',
+        label: '刷新',
+        separatorBefore: true,
+        action: () => void loadRoot(props.rootPath),
+      },
+      {
+        id: 'copy',
+        label: '复制路径',
+        action: async () => {
+          try {
+            await navigator.clipboard.writeText(node.path)
+          } catch {
+            // ignore
+          }
+        },
+      },
+    )
+  }
+
+  contextMenuStore.show({
+    clientX: event.clientX,
+    clientY: event.clientY,
+    items,
+  })
+}
+
+function onEmptyTreeContextMenu(e: MouseEvent) {
+  e.preventDefault()
+  contextMenuStore.show({
+    clientX: e.clientX,
+    clientY: e.clientY,
+    items: [
+      { id: 'nf', label: '新建文件', action: () => beginCreate('file', null) },
+      { id: 'nd', label: '新建文件夹', action: () => beginCreate('dir', null) },
+      {
+        id: 'ref',
+        label: '刷新',
+        separatorBefore: true,
+        action: () => void loadRoot(props.rootPath),
+      },
+    ],
+  })
 }
 
 async function confirmRename() {
@@ -95,16 +194,6 @@ function cancelRename() {
   renameValue.value = ''
 }
 
-function startCreate(type: 'file' | 'dir') {
-  const node = contextMenu.value.node
-  if (!node) return
-
-  createParentPath.value = node.isDirectory ? node.path : node.path.substring(0, Math.max(node.path.lastIndexOf('\\'), node.path.lastIndexOf('/')))
-  isCreating.value = type
-  createValue.value = type === 'file' ? '未命名.md' : '新建文件夹'
-  closeContextMenu()
-}
-
 async function confirmCreate() {
   const nextName = createValue.value.trim()
   if (!isCreating.value || !nextName) {
@@ -135,11 +224,8 @@ function cancelCreate() {
   createParentPath.value = ''
 }
 
-async function deleteNode() {
-  const node = contextMenu.value.node
-  if (!node) return
-  closeContextMenu()
-
+/** 先主进程删除成功，再关标签（与方案 08 一致） */
+async function deleteNodeAt(node: TreeNode) {
   const dirtyTabs = fileStore.tabs.filter(tab => {
     return tab.filePath && (tab.filePath === node.path || tab.filePath.replace(/\\/g, '/').startsWith(node.path.replace(/\\/g, '/') + '/'))
   })
@@ -149,23 +235,20 @@ async function deleteNode() {
   }
 
   try {
-    fileStore.closeTabsInPath(node.path)
     await window.electronAPI?.file.delete(node.path)
+    fileStore.closeTabsInPath(node.path)
     await loadRoot(props.rootPath)
   } catch (err) {
     console.error('Delete failed:', err)
+    window.alert('删除失败，请检查权限或文件是否被占用')
   }
 }
 
-async function refresh() {
-  await loadRoot(props.rootPath)
-}
-
-defineExpose({ refresh })
+defineExpose({ refresh: () => loadRoot(props.rootPath) })
 </script>
 
 <template>
-  <div class="file-tree">
+  <div class="file-tree" @contextmenu.self.prevent="onEmptyTreeContextMenu">
     <FileTreeItem
       v-for="node in rootNodes"
       :key="node.path"
@@ -173,13 +256,12 @@ defineExpose({ refresh })
       :depth="0"
       :activeFilePath="activeFilePath"
       @openFile="onOpenFile"
-      @contextMenu="onContextMenu"
+      @contextMenu="onNodeContextMenu"
     />
 
     <div v-if="!treeLoaded" class="tree-loading">加载中...</div>
-    <div v-else-if="rootNodes.length === 0" class="tree-loading">空文件夹</div>
+    <div v-else-if="rootNodes.length === 0" class="tree-loading">空文件夹（可在空白处右键）</div>
 
-    <!-- 重命名弹窗 -->
     <div v-if="isRenaming" class="inline-input-overlay" @click.self="cancelRename">
       <div class="inline-input-box">
         <label class="inline-label">重命名</label>
@@ -188,17 +270,15 @@ defineExpose({ refresh })
           class="inline-input"
           @keydown.enter="confirmRename"
           @keydown.escape="cancelRename"
-          ref="renameInput"
           autofocus
         />
         <div class="inline-actions">
-          <button class="inline-btn confirm" @click="confirmRename">确认</button>
-          <button class="inline-btn cancel" @click="cancelRename">取消</button>
+          <button type="button" class="inline-btn confirm" @click="confirmRename">确认</button>
+          <button type="button" class="inline-btn cancel" @click="cancelRename">取消</button>
         </div>
       </div>
     </div>
 
-    <!-- 新建弹窗 -->
     <div v-if="isCreating" class="inline-input-overlay" @click.self="cancelCreate">
       <div class="inline-input-box">
         <label class="inline-label">{{ isCreating === 'file' ? '新建文件' : '新建文件夹' }}</label>
@@ -210,34 +290,18 @@ defineExpose({ refresh })
           autofocus
         />
         <div class="inline-actions">
-          <button class="inline-btn confirm" @click="confirmCreate">确认</button>
-          <button class="inline-btn cancel" @click="cancelCreate">取消</button>
+          <button type="button" class="inline-btn confirm" @click="confirmCreate">确认</button>
+          <button type="button" class="inline-btn cancel" @click="cancelCreate">取消</button>
         </div>
       </div>
     </div>
-
-    <!-- 右键菜单 -->
-    <Teleport to="body">
-      <div
-        v-if="contextMenu.visible"
-        class="context-menu"
-        :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
-      >
-        <div class="context-item" @click="startCreate('file')">新建文件</div>
-        <div class="context-item" @click="startCreate('dir')">新建文件夹</div>
-        <div class="context-divider"></div>
-        <div class="context-item" @click="startRename">重命名</div>
-        <div class="context-item danger" @click="deleteNode">删除</div>
-        <div class="context-divider"></div>
-        <div class="context-item" @click="refresh(); closeContextMenu()">刷新</div>
-      </div>
-    </Teleport>
   </div>
 </template>
 
 <style scoped>
 .file-tree {
   position: relative;
+  min-height: 120px;
 }
 
 .tree-loading {
@@ -324,4 +388,3 @@ defineExpose({ refresh })
   background: var(--bg-active);
 }
 </style>
-
