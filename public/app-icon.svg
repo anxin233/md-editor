@@ -1,15 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="MD Editor">
   <defs>
+    <linearGradient id="bg" x1="96" y1="64" x2="416" y2="448" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2563EB"/>
+      <stop offset="0.56" stop-color="#0891B2"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="page" x1="158" y1="108" x2="354" y2="404" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#DFF7FF"/>
+    </linearGradient>
+    <filter id="shadow" x="88" y="82" width="336" height="372" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#07111F" flood-opacity="0.32"/>
+    </filter>
     <clipPath id="squircle">
-      <rect width="512" height="512" rx="113" ry="113"/>
+      <rect width="512" height="512" rx="112" ry="112"/>
     </clipPath>
   </defs>
+
   <g clip-path="url(#squircle)">
-    <rect width="512" height="512" fill="#ffffff"/>
-    <!-- 与 electron-builder 所用 icon.png 同源；经典粗体 M（与打包图标一致） -->
-    <path
-      fill="#4A90E0"
-      d="M 96 416 L 96 96 L 156 96 L 256 256 L 356 96 L 416 96 L 416 416 L 356 416 L 356 196 L 256 336 L 156 196 L 156 416 Z"
-    />
+    <rect width="512" height="512" fill="url(#bg)"/>
+    <path d="M102 397L410 104" stroke="#7DD3FC" stroke-width="18" stroke-linecap="round" opacity="0.22"/>
+    <path d="M115 178C156 109 244 76 321 97C393 116 433 172 438 240" fill="none" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" opacity="0.16"/>
+
+    <g filter="url(#shadow)">
+      <path d="M151 96H323L382 155V405C382 421.016 369.016 434 353 434H151C134.984 434 122 421.016 122 405V125C122 108.984 134.984 96 151 96Z" fill="url(#page)"/>
+      <path d="M323 96V139C323 154.464 335.536 167 351 167H382L323 96Z" fill="#A7F3D0"/>
+      <path d="M323 97V139C323 154.464 335.536 167 351 167H381" fill="none" stroke="#0F766E" stroke-width="8" stroke-linejoin="round" opacity="0.48"/>
+    </g>
+
+    <path d="M171 321V206H198L236 268L274 206H301V321H274V253L242 304H230L198 253V321H171Z" fill="#0F172A"/>
+    <path d="M323 210H348V293H377L335.5 342L294 293H323V210Z" fill="#0891B2"/>
+    <rect x="165" y="360" width="182" height="13" rx="6.5" fill="#38BDF8" opacity="0.88"/>
   </g>
 </svg>

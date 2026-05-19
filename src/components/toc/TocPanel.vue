@@ -2,12 +2,9 @@
 import { computed } from 'vue'
 import { useFileStore } from '@/stores/file'
 import { useEditorStore } from '@/stores/editor'
+import { parseMarkdownHeadings, type MarkdownHeading } from '@/utils/markdownHeadings'
 
-interface TocItem {
-  level: number
-  text: string
-  line: number
-}
+type TocItem = MarkdownHeading
 
 const fileStore = useFileStore()
 const editorStore = useEditorStore()
@@ -15,32 +12,7 @@ const editorStore = useEditorStore()
 const headings = computed<TocItem[]>(() => {
   const content = fileStore.activeTab?.content || ''
   if (!content) return []
-
-  const items: TocItem[] = []
-  const lines = content.split('\n')
-  let inCodeBlock = false
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-
-    const trimmedLine = line.trimStart()
-    if (trimmedLine.startsWith('```') || trimmedLine.startsWith('~~~')) {
-      inCodeBlock = !inCodeBlock
-      continue
-    }
-    if (inCodeBlock) continue
-
-    const match = line.match(/^(#{1,6})\s+(.+)/)
-    if (match) {
-      items.push({
-        level: match[1].length,
-        text: match[2].replace(/[#*`\[\]()]/g, '').trim(),
-        line: i + 1,
-      })
-    }
-  }
-
-  return items
+  return parseMarkdownHeadings(content)
 })
 
 const minLevel = computed(() => {
@@ -64,7 +36,11 @@ const activeHeadingIndex = computed(() => {
 })
 
 function scrollToHeading(item: TocItem) {
-  editorStore.requestScrollToLine(item.line)
+  editorStore.requestScrollToLine(item.line, {
+    headingIndex: item.headingIndex,
+    level: item.level,
+    text: item.text,
+  })
 }
 </script>
 

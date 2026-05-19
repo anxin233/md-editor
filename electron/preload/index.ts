@@ -88,6 +88,10 @@ export interface ElectronAPI {
     install: () => Promise<void>
     onStatus: (callback: (status: UpdateStatus) => void) => () => void
   }
+  app: {
+    readyToOpenFiles: () => Promise<void>
+    onOpenExternalFile: (callback: (filePath: string) => void) => () => void
+  }
   onCtrlTab: (callback: (isShift: boolean) => void) => () => void
 }
 
@@ -151,6 +155,14 @@ const electronAPI: ElectronAPI = {
       const handler = (_event: Electron.IpcRendererEvent, data: UpdateStatus) => callback(data)
       ipcRenderer.on('update:status', handler)
       return () => ipcRenderer.removeListener('update:status', handler)
+    },
+  },
+  app: {
+    readyToOpenFiles: () => ipcRenderer.invoke('app:renderer-ready'),
+    onOpenExternalFile: (callback: (filePath: string) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, filePath: string) => callback(filePath)
+      ipcRenderer.on('app:open-file', handler)
+      return () => ipcRenderer.removeListener('app:open-file', handler)
     },
   },
   onCtrlTab: (callback: (isShift: boolean) => void) => {

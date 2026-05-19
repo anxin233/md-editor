@@ -23,6 +23,7 @@ let keydownHandler: ((e: KeyboardEvent) => void) | null = null
 let autoSaveTimer: ReturnType<typeof setInterval> | null = null
 let ctrlTabCleanup: (() => void) | null = null
 let appCommandCleanup: (() => void) | null = null
+let externalOpenFileCleanup: (() => void) | null = null
 let preserveWysiwygTimer: ReturnType<typeof setTimeout> | null = null
 
 onMounted(async () => {
@@ -32,6 +33,8 @@ onMounted(async () => {
   setupAutoSave()
   setupCtrlTab()
   setupAppCommands()
+  setupExternalOpenFiles()
+  await window.electronAPI?.app?.readyToOpenFiles?.()
   initShiki()
 
   window.addEventListener('beforeunload', onBeforeUnload)
@@ -51,6 +54,10 @@ onUnmounted(() => {
   if (appCommandCleanup) {
     appCommandCleanup()
     appCommandCleanup = null
+  }
+  if (externalOpenFileCleanup) {
+    externalOpenFileCleanup()
+    externalOpenFileCleanup = null
   }
   window.removeEventListener('beforeunload', onBeforeUnload)
 })
@@ -160,6 +167,12 @@ function setupAppCommands() {
   })
 }
 
+function setupExternalOpenFiles() {
+  externalOpenFileCleanup = window.electronAPI?.app?.onOpenExternalFile?.(async (filePath) => {
+    await openExternalFile(filePath)
+  }) || null
+}
+
 async function openFileFromDialog() {
   try {
     const filePath = await window.electronAPI?.dialog.openFile()
@@ -189,6 +202,16 @@ async function openRecentFile(filePath: string) {
     settingsStore.addRecentFile(filePath, opened.fileName)
   } catch {
     settingsStore.removeRecentFile(filePath)
+  }
+}
+
+async function openExternalFile(filePath: string) {
+  try {
+    const opened = await fileStore.openPath(filePath)
+    if (!opened) return
+    settingsStore.addRecentFile(filePath, opened.fileName)
+  } catch (err) {
+    console.error('Failed to open external file:', err)
   }
 }
 

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, onMounted, watch, nextTick, provide } from 'vue'
 import { MilkdownProvider } from '@milkdown/vue'
 import MilkdownEditor from './MilkdownEditor.vue'
 import { buildTyporaWysiwygMenu } from '@/utils/editorContextMenu'
 import { useFileStore } from '@/stores/file'
 import { useContextMenuStore } from '@/stores/contextMenu'
+import { wysiwygScrollContainerKey } from './wysiwygContext'
 
 const props = defineProps<{
   modelValue: string
@@ -18,6 +19,12 @@ const fileStore = useFileStore()
 const editorRootRef = ref<HTMLDivElement>()
 const milkdownRef = ref<InstanceType<typeof MilkdownEditor>>()
 const contextMenuStore = useContextMenuStore()
+
+provide(wysiwygScrollContainerKey, editorRootRef)
+
+function getScrollContainer() {
+  return editorRootRef.value
+}
 
 function onUpdate(value: string) {
   emit('update:modelValue', value)
@@ -149,6 +156,7 @@ watch(() => fileStore.activeTabId, () => {
       <MilkdownEditor
         ref="milkdownRef"
         :modelValue="modelValue"
+        :get-scroll-container="getScrollContainer"
         @update:modelValue="onUpdate"
       />
     </MilkdownProvider>
@@ -166,6 +174,7 @@ watch(() => fileStore.activeTabId, () => {
   background: var(--editor-bg);
   cursor: text;
   min-width: 0;
+  min-height: 0;
 }
 </style>
 

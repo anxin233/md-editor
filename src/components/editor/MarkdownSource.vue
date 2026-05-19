@@ -640,9 +640,10 @@ watch(() => editorStore.formatRequest, (req) => {
   editorStore.clearFormatRequest()
 })
 
-watch(() => editorStore.targetScrollLine, (line) => {
-  if (line == null || !view.value) return
+watch(() => editorStore.scrollRequest, (request) => {
+  if (!request || !view.value) return
   try {
+    const line = request.line
     const docLine = view.value.state.doc.line(Math.min(line, view.value.state.doc.lines))
     view.value.dispatch({
       effects: EditorView.scrollIntoView(docLine.from, { y: 'center' }),

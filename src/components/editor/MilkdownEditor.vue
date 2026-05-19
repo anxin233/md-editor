@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch } from 'vue'
+import { inject, watch, nextTick } from 'vue'
 import { useEditor, useInstance } from '@milkdown/vue'
 import { Editor, rootCtx, defaultValueCtx, editorViewCtx, commandsCtx } from '@milkdown/core'
 import type { Node as ProseNode, NodeType, ResolvedPos, MarkType } from '@milkdown/prose/model'
@@ -35,11 +35,16 @@ import {
   setPmTableColumnAlignment,
   type PmTableTarget,
 } from '@/utils/proseMirrorTable'
+import { parseMarkdownHeadings } from '@/utils/markdownHeadings'
+import { resolveWysiwygScrollContainer, scrollWysiwygToPosition } from '@/utils/wysiwygScroll'
+import { wysiwygScrollContainerKey } from './wysiwygContext'
 
 const editorStore = useEditorStore()
+const scrollContainerRef = inject(wysiwygScrollContainerKey, null)
 
 const props = defineProps<{
   modelValue: string
+  getScrollContainer?: () => HTMLElement | undefined
 }>()
 
 const emit = defineEmits<{
@@ -120,6 +125,55 @@ const underlineSchema = $markSchema('underline', () => ({
   },
 }))
 
+function findHeadingPosByIndex(doc: ProseNode, headingIndex: number): number | null {
+  let current = 0
+  let targetPos: number | null = null
+  let done = false
+
+  doc.descendants((node, pos) => {
+    if (done) return false
+    if (node.type.name !== 'heading') return true
+    if (current === headingIndex) {
+      targetPos = pos
+      done = true
+      return false
+    }
+    current++
+    return false
+  })
+
+  return targetPos
+}
+
+function findActiveHeadingIndex(doc: ProseNode, pos: number): number | null {
+  let current = 0
+  let active: number | null = null
+
+  doc.descendants((node, nodePos) => {
+    if (node.type.name !== 'heading') return true
+    if (nodePos <= pos) {
+      active = current
+    }
+    current++
+    return false
+  })
+
+  return active
+}
+
+function updateCursorFromPmPosition(doc: ProseNode, pos: number) {
+  const headingIndex = findActiveHeadingIndex(doc, pos)
+  if (headingIndex == null) {
+    editorStore.updateCursor(1, 1)
+    return
+  }
+
+  const heading = parseMarkdownHeadings(props.modelValue).find(item => item.headingIndex === headingIndex)
+  if (heading) {
+    editorStore.updateCursor(heading.line, 1)
+  }
+}
+
 useEditor((root) => {
   const editor = Editor.make()
     .config((ctx) => {
@@ -134,6 +188,16 @@ useEditor((root) => {
             emit('update:modelValue', markdown)
             isInternalUpdate = false
           }
+        })
+        .selectionUpdated((_ctx, selection) => {
+          let view: ProseMirrorEditorView | undefined
+          try {
+            view = _ctx.get(editorViewCtx)
+          } catch {
+            return
+          }
+          if (!view?.state?.doc) return
+          updateCursorFromPmPosition(view.state.doc, selection.from)
         })
     })
     .use(commonmark)
@@ -1139,6 +1203,72 @@ watch(() => editorStore.formatRequest, (req) => {
   if (!req) return
   handleFormatCommand(req.command, req.data, req.pmRange)
   editorStore.clearFormatRequest()
+})
+
+watch([() => editorStore.scrollRequest, () => loading.value], async ([request]) => {
+  if (!request) return
+  const editor = getEditor()
+  if (!editor || loading.value) return
+
+  let didScroll = false
+  let scrollTask: { view: ProseMirrorEditorView; pos: number; preferred: HTMLElement | null } | null = null
+
+  editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx)
+    const headingIndex = request.headingIndex
+      ?? parseMarkdownHeadings(props.modelValue).find(item => item.line === request.line)?.headingIndex
+    if (headingIndex == null) return
+
+    const pos = findHeadingPosByIndex(view.state.doc, headingIndex)
+    if (pos == null) return
+
+    const anchor = Math.min(pos + 1, view.state.doc.content.size)
+    const selection = TextSelection.near(view.state.doc.resolve(anchor))
+
+    view.focus()
+    view.dispatch(view.state.tr.setSelection(selection))
+
+    const preferred =
+      props.getScrollContainer?.()
+      ?? scrollContainerRef?.value
+      ?? (view.dom.closest('.wysiwyg-editor') as HTMLElement | null)
+
+    scrollTask = { view, pos, preferred }
+    editorStore.updateCursor(request.line, 1)
+    didScroll = true
+  })
+
+  if (!didScroll) {
+    editorStore.showStatusToast('无法定位大纲标题')
+    editorStore.clearScrollRequest()
+    return
+  }
+
+  const runScroll = () => {
+    if (!scrollTask) return false
+    const { view, pos, preferred } = scrollTask
+    const scrollEl = resolveWysiwygScrollContainer(preferred, view, pos)
+    if (!scrollEl) return false
+    return scrollWysiwygToPosition(scrollEl, view, pos)
+  }
+
+  await nextTick()
+  if (!runScroll()) {
+    await new Promise<void>(resolve => {
+      requestAnimationFrame(() => {
+        if (!runScroll()) {
+          requestAnimationFrame(() => {
+            runScroll()
+            resolve()
+          })
+        } else {
+          resolve()
+        }
+      })
+    })
+  }
+
+  editorStore.clearScrollRequest()
 })
 
 function syncContextMenuSelection(clientX: number, clientY: number) {

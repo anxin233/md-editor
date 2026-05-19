@@ -1,6 +1,6 @@
-import { existsSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import { app, BrowserWindow, ipcMain, dialog, shell, Menu } from 'electron'
-import { join, dirname } from 'path'
+import { join, dirname, resolve } from 'path'
 import { fileURLToPath } from 'url'
 import { registerFileIpcHandlers, closeAllWatchers } from './ipc/file.ipc'
 import { registerDialogIpcHandlers } from './ipc/dialog.ipc'
@@ -8,13 +8,17 @@ import { registerExportIpcHandlers } from './ipc/export.ipc'
 import { registerRecentIpcHandlers } from './ipc/recent.ipc'
 import { registerSettingsIpcHandlers } from './ipc/settings.ipc'
 import { registerUpdateIpcHandlers, attachUpdateTargetWindow } from './ipc/update.ipc'
+import { grantMarkdownFileAndDocDirectory, isSupportedMarkdownFilePath } from './security/fileAccess'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 let mainWindow: BrowserWindow | null = null
+let rendererReadyForOpenFiles = false
+const pendingOpenFiles: string[] = []
+const startupOpenFiles = collectMarkdownFilesFromArgv(process.argv)
 
-/** Same asset as electron-builder `build.icon` (Vite copies `public/` → `dist/`). */
+/** Same source asset as the app icon; Vite copies `public/` to `dist/`. */
 function resolveWindowIcon(): string | undefined {
   const distIcon = join(__dirname, '../../dist/icon.png')
   const publicIcon = join(__dirname, '../../public/icon.png')
@@ -29,6 +33,7 @@ function resolveWindowIcon(): string | undefined {
 Menu.setApplicationMenu(null)
 
 const createWindow = () => {
+  rendererReadyForOpenFiles = false
   const windowIcon = resolveWindowIcon()
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -83,28 +88,60 @@ const createWindow = () => {
 
   mainWindow.on('closed', () => {
     mainWindow = null
+    rendererReadyForOpenFiles = false
     attachUpdateTargetWindow(null)
   })
 
   attachUpdateTargetWindow(mainWindow)
 }
 
-app.whenReady().then(() => {
-  registerFileIpcHandlers()
-  registerDialogIpcHandlers()
-  registerExportIpcHandlers()
-  registerRecentIpcHandlers()
-  registerSettingsIpcHandlers()
-  registerUpdateIpcHandlers()
-  registerWindowIpcHandlers()
-  createWindow()
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+if (!gotSingleInstanceLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (_event, commandLine) => {
+    if (!mainWindow && app.isReady()) {
       createWindow()
     }
+    focusMainWindow()
+    for (const filePath of collectMarkdownFilesFromArgv(commandLine)) {
+      queueExternalOpenFile(filePath)
+    }
   })
-})
+
+  app.on('open-file', (event, filePath) => {
+    event.preventDefault()
+    queueExternalOpenFile(filePath)
+    if (app.isReady()) {
+      if (!mainWindow) {
+        createWindow()
+      }
+      focusMainWindow()
+    }
+  })
+
+  app.whenReady().then(() => {
+    registerFileIpcHandlers()
+    registerDialogIpcHandlers()
+    registerExportIpcHandlers()
+    registerRecentIpcHandlers()
+    registerSettingsIpcHandlers()
+    registerUpdateIpcHandlers()
+    registerWindowIpcHandlers()
+    createWindow()
+
+    for (const filePath of startupOpenFiles) {
+      queueExternalOpenFile(filePath)
+    }
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow()
+      }
+    })
+  })
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -147,6 +184,11 @@ function registerWindowIpcHandlers() {
     }
   })
 
+  ipcMain.handle('app:renderer-ready', () => {
+    rendererReadyForOpenFiles = true
+    flushPendingOpenFiles()
+  })
+
   ipcMain.handle('window:confirmClose', async (_event, hasDirty: boolean) => {
     if (!hasDirty || !mainWindow) return true
 
@@ -162,4 +204,75 @@ function registerWindowIpcHandlers() {
     return result.response
   })
 
+}
+
+function normalizeExternalMarkdownPath(rawPath: string): string | null {
+  if (!rawPath || rawPath.startsWith('--')) return null
+
+  let candidate = rawPath
+  if (candidate.startsWith('file://')) {
+    try {
+      candidate = fileURLToPath(candidate)
+    } catch {
+      return null
+    }
+  }
+
+  const resolved = resolve(candidate)
+  if (!isSupportedMarkdownFilePath(resolved)) return null
+
+  try {
+    const st = statSync(resolved)
+    if (!st.isFile()) return null
+  } catch {
+    return null
+  }
+
+  return resolved
+}
+
+function collectMarkdownFilesFromArgv(argv: string[]): string[] {
+  const files: string[] = []
+  const seen = new Set<string>()
+
+  for (const arg of argv) {
+    const resolved = normalizeExternalMarkdownPath(arg)
+    if (!resolved || seen.has(resolved)) continue
+    seen.add(resolved)
+    files.push(resolved)
+  }
+
+  return files
+}
+
+function queueExternalOpenFile(filePath: string) {
+  const resolved = normalizeExternalMarkdownPath(filePath)
+  if (!resolved) return
+
+  grantMarkdownFileAndDocDirectory(resolved)
+
+  if (rendererReadyForOpenFiles && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('app:open-file', resolved)
+    return
+  }
+
+  if (!pendingOpenFiles.includes(resolved)) {
+    pendingOpenFiles.push(resolved)
+  }
+}
+
+function flushPendingOpenFiles() {
+  if (!rendererReadyForOpenFiles || !mainWindow || mainWindow.isDestroyed()) return
+
+  const files = pendingOpenFiles.splice(0)
+  for (const filePath of files) {
+    mainWindow.webContents.send('app:open-file', filePath)
+  }
+}
+
+function focusMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.show()
+  mainWindow.focus()
 }

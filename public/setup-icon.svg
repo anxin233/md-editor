@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="MD Editor Setup">
+  <defs>
+    <linearGradient id="bg" x1="96" y1="64" x2="416" y2="448" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0F172A"/>
+      <stop offset="0.58" stop-color="#1D4ED8"/>
+      <stop offset="1" stop-color="#0F766E"/>
+    </linearGradient>
+    <linearGradient id="tray" x1="142" y1="288" x2="372" y2="408" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#DFF7FF"/>
+    </linearGradient>
+    <filter id="shadow" x="82" y="70" width="360" height="382" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#020617" flood-opacity="0.35"/>
+    </filter>
+    <clipPath id="squircle">
+      <rect width="512" height="512" rx="112" ry="112"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#squircle)">
+    <rect width="512" height="512" fill="url(#bg)"/>
+    <path d="M102 388L414 96" stroke="#7DD3FC" stroke-width="16" stroke-linecap="round" opacity="0.18"/>
+    <circle cx="390" cy="134" r="44" fill="#FFFFFF" opacity="0.1"/>
+
+    <g filter="url(#shadow)">
+      <path d="M148 296H364L400 356V400C400 417.673 385.673 432 368 432H144C126.327 432 112 417.673 112 400V356L148 296Z" fill="url(#tray)"/>
+      <path d="M148 296H364L400 356H112L148 296Z" fill="#F8FAFC"/>
+      <path d="M112 356H400" stroke="#0E7490" stroke-width="8" opacity="0.3"/>
+      <rect x="166" y="382" width="180" height="14" rx="7" fill="#38BDF8"/>
+    </g>
+
+    <path d="M238 96H274V244H326L256 324L186 244H238V96Z" fill="#FFFFFF"/>
+    <path d="M238 96H274V244H326L256 324L186 244H238V96Z" fill="#5EEAD4" opacity="0.18"/>
+
+    <g>
+      <rect x="126" y="112" width="104" height="104" rx="24" fill="#FFFFFF"/>
+      <path d="M151 184V144H162L178 170L194 144H205V184H194V162L181 182H175L162 162V184H151Z" fill="#0F172A"/>
+    </g>
+  </g>
+</svg>

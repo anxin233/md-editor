@@ -1,6 +1,6 @@
 {
   "name": "md-editor",
-  "version": "1.1.0",
+  "version": "2026.519.1128",
   "license": "MIT",
   "description": "A Typora-like Markdown editor built with Electron + Vue 3",
   "main": "dist-electron/main/index.js",
@@ -84,22 +84,33 @@
         "ext": "md",
         "name": "Markdown Document",
         "mimeType": "text/markdown",
-        "role": "Editor"
+        "role": "Editor",
+        "icon": "build/file-icon"
       },
       {
         "ext": "markdown",
         "name": "Markdown Document",
         "mimeType": "text/markdown",
-        "role": "Editor"
+        "role": "Editor",
+        "icon": "build/file-icon"
       },
       {
         "ext": "mdown",
         "name": "Markdown Document",
         "mimeType": "text/markdown",
-        "role": "Editor"
+        "role": "Editor",
+        "icon": "build/file-icon"
+      },
+      {
+        "ext": "mkd",
+        "name": "Markdown Document",
+        "mimeType": "text/markdown",
+        "role": "Editor",
+        "icon": "build/file-icon"
       }
     ],
     "win": {
+      "icon": "build/app-icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -113,6 +124,7 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/setup-icon.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "MD Editor",
@@ -123,6 +135,7 @@
       "license": null
     },
     "mac": {
+      "icon": "build/app-icon.icns",
       "target": [
         "dmg",
         "zip"

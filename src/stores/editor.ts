@@ -4,6 +4,14 @@ import { ref, computed } from 'vue'
 /** ProseMirror 文档坐标：右键专项命令优先作用于此区间 */
 export type PmStructuralRange = { from: number; to: number }
 
+export interface ScrollRequest {
+  id: number
+  line: number
+  headingIndex?: number
+  level?: number
+  text?: string
+}
+
 export const useEditorStore = defineStore('editor', () => {
   const cursorLine = ref(1)
   const cursorColumn = ref(1)
@@ -11,7 +19,7 @@ export const useEditorStore = defineStore('editor', () => {
   const charCount = ref(0)
   const lineCount = ref(0)
   const encoding = ref('UTF-8')
-  const targetScrollLine = ref<number | null>(null)
+  const scrollRequest = ref<ScrollRequest | null>(null)
   const searchRequest = ref<{ id: number; mode: 'find' | 'replace' } | null>(null)
   const headingRequest = ref<{ id: number; level: number } | null>(null)
   const formatRequest = ref<{
@@ -60,12 +68,18 @@ export const useEditorStore = defineStore('editor', () => {
     wordCount.value = (chineseChars?.length || 0) + (englishWords?.length || 0)
   }
 
-  function requestScrollToLine(line: number) {
-    targetScrollLine.value = line
+  let scrollRequestSeq = 0
+
+  function requestScrollToLine(line: number, target?: Omit<ScrollRequest, 'id' | 'line'>) {
+    scrollRequest.value = {
+      id: ++scrollRequestSeq,
+      line,
+      ...target,
+    }
   }
 
   function clearScrollRequest() {
-    targetScrollLine.value = null
+    scrollRequest.value = null
   }
 
   function requestSearch(mode: 'find' | 'replace') {
@@ -102,7 +116,7 @@ export const useEditorStore = defineStore('editor', () => {
     lineCount,
     encoding,
     cursorPosition,
-    targetScrollLine,
+    scrollRequest,
     searchRequest,
     headingRequest,
     formatRequest,

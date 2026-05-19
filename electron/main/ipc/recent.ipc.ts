@@ -1,18 +1,12 @@
 import { app, ipcMain } from 'electron'
 import { mkdir, readFile, stat, writeFile } from 'fs/promises'
-import { basename, dirname, extname, join, resolve } from 'path'
-import { assertReadText, grantMarkdownFileAndDocDirectory } from '../security/fileAccess'
+import { basename, dirname, join, resolve } from 'path'
+import { assertReadText, grantMarkdownFileAndDocDirectory, isSupportedMarkdownFilePath } from '../security/fileAccess'
 
 export interface RecentFileItem {
   path: string
   name: string
   time: number
-}
-
-const MARKDOWN_EXT = new Set(['.md', '.markdown', '.mdown', '.mkd'])
-
-function isMarkdownPath(filePath: string): boolean {
-  return MARKDOWN_EXT.has(extname(filePath).toLowerCase())
 }
 
 const recentFilePath = join(app.getPath('userData'), 'recent-files.json')
@@ -49,7 +43,7 @@ export function registerRecentIpcHandlers() {
 
   ipcMain.handle('recent:add', async (_event, filePath: string, fileName: string): Promise<RecentFileItem[]> => {
     const abs = resolve(filePath)
-    if (!isMarkdownPath(abs)) return readRecentFiles()
+    if (!isSupportedMarkdownFilePath(abs)) return readRecentFiles()
     try {
       assertReadText(abs)
     } catch {
@@ -68,7 +62,7 @@ export function registerRecentIpcHandlers() {
     content: string
   } | null> => {
     const resolvedRequested = resolve(filePath)
-    if (!isMarkdownPath(resolvedRequested)) return null
+    if (!isSupportedMarkdownFilePath(resolvedRequested)) return null
     const recent = await readRecentFiles()
     const allowed = recent.some(r => resolve(r.path) === resolvedRequested)
     if (!allowed) return null

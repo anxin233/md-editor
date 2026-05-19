@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Markdown Document">
+  <defs>
+    <linearGradient id="paper" x1="130" y1="66" x2="382" y2="446" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E0F2FE"/>
+    </linearGradient>
+    <linearGradient id="fold" x1="330" y1="78" x2="414" y2="164" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#BAE6FD"/>
+      <stop offset="1" stop-color="#5EEAD4"/>
+    </linearGradient>
+    <filter id="shadow" x="76" y="48" width="360" height="430" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#0F172A" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="96" fill="#F8FAFC"/>
+  <g filter="url(#shadow)">
+    <path d="M132 64H322L400 142V426C400 442.569 386.569 456 370 456H132C115.431 456 102 442.569 102 426V94C102 77.431 115.431 64 132 64Z" fill="url(#paper)"/>
+    <path d="M102 94C102 77.431 115.431 64 132 64H148V456H132C115.431 456 102 442.569 102 426V94Z" fill="#2563EB"/>
+    <path d="M322 64V126C322 142.569 335.431 156 352 156H400L322 64Z" fill="url(#fold)"/>
+    <path d="M322 64V126C322 142.569 335.431 156 352 156H400" fill="none" stroke="#0E7490" stroke-width="8" stroke-linejoin="round" opacity="0.45"/>
+  </g>
+
+  <path d="M184 311V216H207L238 268L269 216H292V311H269V255L243 297H233L207 255V311H184Z" fill="#0F172A"/>
+  <path d="M312 217H336V282H363L324 328L285 282H312V217Z" fill="#0891B2"/>
+  <rect x="184" y="360" width="172" height="12" rx="6" fill="#38BDF8"/>
+  <rect x="184" y="389" width="120" height="10" rx="5" fill="#94A3B8" opacity="0.72"/>
+</svg>

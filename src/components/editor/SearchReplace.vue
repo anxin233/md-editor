@@ -120,7 +120,8 @@ function applySingleReplacement(sourceText: string): string {
     const singlePattern = createPattern(false)
     return singlePattern ? sourceText.replace(singlePattern, replaceText.value) : sourceText
   }
-  return replaceText.value
+  const singlePattern = createPattern(false)
+  return singlePattern ? sourceText.replace(singlePattern, () => replaceText.value) : sourceText
 }
 
 function replaceCurrent() {
@@ -142,7 +143,9 @@ function replaceCurrent() {
 function replaceAll() {
   const pattern = createPattern(true)
   if (!pattern) return
-  const nextContent = props.content.replace(pattern, replaceText.value)
+  const nextContent = useRegex.value
+    ? props.content.replace(pattern, replaceText.value)
+    : props.content.replace(pattern, () => replaceText.value)
   emit('update:content', nextContent)
   currentIndex.value = 0
 }

@@ -24,6 +24,11 @@ export interface FilePermissionEntry {
 }
 
 const entries: FilePermissionEntry[] = []
+const MARKDOWN_EXT = new Set(['.md', '.markdown', '.mdown', '.mkd'])
+
+export function isSupportedMarkdownFilePath(filePath: string): boolean {
+  return MARKDOWN_EXT.has(extname(filePath).toLowerCase())
+}
 
 function pathInDirectoryScope(dirRoot: string, targetAbs: string): boolean {
   const root = resolve(dirRoot)
