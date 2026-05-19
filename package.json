@@ -1,6 +1,6 @@
 {
   "name": "md-editor",
-  "version": "2026.519.1128",
+  "version": "2026.519.1428",
   "license": "MIT",
   "description": "A Typora-like Markdown editor built with Electron + Vue 3",
   "main": "dist-electron/main/index.js",
